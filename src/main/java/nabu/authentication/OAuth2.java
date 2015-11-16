@@ -59,6 +59,7 @@ public class OAuth2 {
 			redirectLink += (webArtifact.getConfiguration().getPath().startsWith("/") ? "" : "/") + webArtifact.getConfiguration().getPath();
 		}
 		redirectLink += oauth2.getRelativePath();
+		redirectLink = redirectLink.replace("//", "/");
 		
 		String endpoint = loginEndpoint.toString()
 			+ "?client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId())

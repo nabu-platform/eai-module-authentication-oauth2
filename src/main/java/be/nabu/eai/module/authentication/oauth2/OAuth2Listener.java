@@ -35,6 +35,7 @@ import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.binding.api.Window;
 import be.nabu.libs.types.binding.json.JSONBinding;
 import be.nabu.libs.types.java.BeanResolver;
+import be.nabu.libs.types.structure.Structure;
 import be.nabu.utils.io.IOUtils;
 import be.nabu.utils.mime.api.ContentPart;
 import be.nabu.utils.mime.api.Header;
@@ -88,7 +89,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					String requestContent = "code=" + URIUtils.encodeURIComponent(code) 
 						+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())
 						+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
-						+ "&redirect_uri=" + URIUtils.encodeURI(uri.toString())
+						+ "&redirect_uri=" + URIUtils.encodeURI(uri.toString().replaceAll("\\?.*", ""))
 						+ "&grant_type=authorization_code";
 					byte[] bytes = requestContent.getBytes("ASCII");
 					HTTPRequest request = new DefaultHTTPRequest("POST", artifact.getConfiguration().getTokenEndpoint().getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
@@ -101,15 +102,16 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 					}
 					JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Token.class));
+					binding.setIgnoreUnknownElements(true);
 					ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
 					OAuth2Authenticator proxy = POJOUtils.newProxy(
 						OAuth2Authenticator.class, 
-						artifact.getConfiguration().getAuthenticatorService(), 
 						artifact.getConfiguration().getWebArtifact().getServiceTracker(),
 						artifact.getRepository(),
-						SystemPrincipal.ROOT
+						SystemPrincipal.ROOT,
+						artifact.getConfiguration().getAuthenticatorService() 
 					);
-					TokenWithSecret token = proxy.authenticate(artifact.getConfiguration().getWebArtifact().getRealm(), TypeUtils.getAsBean(unmarshal, OAuth2Token.class));
+					TokenWithSecret token = proxy.authenticate(artifact.getId(), artifact.getConfiguration().getWebArtifact().getRealm(), TypeUtils.getAsBean(unmarshal, OAuth2Token.class, BeanResolver.getInstance()));
 					if (token == null) {
 						throw new HTTPException(500, "Login failed");
 					}
@@ -143,8 +145,9 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					// set the token in the session
 					newSession.set(GlueListener.buildTokenName(artifact.getConfiguration().getWebArtifact().getRealm()), token);
 					// set the correct headers to update the session
-					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, session.getId(), null, webArtifactPath, null, secure, true));
+					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webArtifactPath, null, secure, true));
 					responseHeaders.add(new MimeHeader("Location", artifact.getConfiguration().getSuccessPath()));
+					responseHeaders.add(new MimeHeader("Content-Length", "0"));
 					return new DefaultHTTPResponse(307, HTTPCodes.getMessage(307),
 						new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
 					);

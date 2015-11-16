@@ -62,6 +62,7 @@ public class OAuth2Configuration {
 		this.scopes = scopes;
 	}
 	
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public HTTPClientArtifact getHttpClient() {
 		return httpClient;
 	}
@@ -69,6 +70,7 @@ public class OAuth2Configuration {
 		this.httpClient = httpClient;
 	}
 	
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull
 	public WebArtifact getWebArtifact() {
 		return webArtifact;

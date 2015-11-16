@@ -47,6 +47,9 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 	@Override
 	public void start() throws IOException {
 		String artifactPath = getConfiguration().getWebArtifact().getConfiguration().getPath() == null || getConfiguration().getWebArtifact().getConfiguration().getPath().isEmpty() ? "/" : getConfiguration().getWebArtifact().getConfiguration().getPath();
+		if (artifactPath.endsWith("/")) {
+			artifactPath = artifactPath.substring(0, artifactPath.length() - 1);
+		}
 		if (getConfiguration().getServerPath() != null && !getConfiguration().getServerPath().isEmpty()) {
 			artifactPath += (getConfiguration().getServerPath().startsWith("/") ? "" : "/") + getConfiguration().getServerPath();
 		}
