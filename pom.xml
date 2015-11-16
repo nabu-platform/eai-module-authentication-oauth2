@@ -1,0 +1,92 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>nabu</groupId>
+	<artifactId>eai-module-authentication-oauth2</artifactId>
+	<packaging>bundle</packaging>
+	<version>1.0-SNAPSHOT</version>
+	<name>eai-module-authentication-oauth2</name>
+	<url>http://nabu.be</url>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.felix</groupId>
+				<artifactId>maven-bundle-plugin</artifactId>
+				<version>2.3.7</version>
+				<extensions>true</extensions>
+				<configuration>
+					<instructions>
+						<Bundle-SymbolicName>${project.groupId}.${project.artifactId}</Bundle-SymbolicName>
+						<Bundle-Name>${project.artifactId}</Bundle-Name>
+						<Bundle-Version>1.0.0</Bundle-Version>
+						<Export-Package>${project.groupId}.services.*</Export-Package>
+						<Service-Component>OSGI-INF/*.xml</Service-Component>
+					</instructions>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.6</source>
+					<target>1.6</target>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<licenses>
+		<license>
+			<name>LGPL 3.0 License</name>
+			<url>http://www.gnu.org/licenses/lgpl.html</url>
+		</license>
+	</licenses>
+
+	<dependencies>
+		<dependency>
+			<groupId>be.nabu.libs.http</groupId>
+			<artifactId>http-client</artifactId>
+			<version>1.1-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>nabu</groupId>
+			<artifactId>eai-module-protocol-http</artifactId>
+			<version>1.0-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>be.nabu.eai</groupId>
+			<artifactId>eai-developer</artifactId>
+			<version>1.0-SNAPSHOT</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>be.nabu.eai</groupId>
+			<artifactId>eai-repository</artifactId>
+			<version>1.0-SNAPSHOT</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>be.nabu.libs.http</groupId>
+			<artifactId>http-core</artifactId>
+			<version>1.1-SNAPSHOT</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.6.4</version>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
+
+	<distributionManagement>
+		<repository>
+			<uniqueVersion>false</uniqueVersion>
+			<id>nabu</id>
+			<name>Nabu Maven Repository</name>
+			<url>http://localhost:5555/maven</url>
+			<layout>default</layout>
+		</repository>
+	</distributionManagement>
+</project>
