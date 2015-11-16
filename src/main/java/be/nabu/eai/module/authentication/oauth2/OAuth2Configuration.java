@@ -4,6 +4,8 @@ import java.net.URI;
 import java.util.List;
 
 import javax.validation.constraints.NotNull;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.InterfaceFilter;
@@ -12,6 +14,8 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 import be.nabu.module.protocol.http.artifact.HTTPClientArtifact;
 
+@XmlRootElement(name = "oAuth2")
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService" })
 public class OAuth2Configuration {
 	
 	private String clientId;
