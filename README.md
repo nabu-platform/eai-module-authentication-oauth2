@@ -28,10 +28,11 @@ There are a couple of things that need to happen:
 For `google` this boils down to:
 
 OAuth2 Artifact:
-- scopes: email, profile (if you are only interested in these)
-- loginEndpoint: https://accounts.google.com/o/oauth2/auth
-- tokenEndpoint: https://www.googleapis.com/oauth2/v3/token
-- apiEndpoint: https://www.googleapis.com/oauth2/v1/userinfo?alt=json
+
+- **scopes**: email, profile (if you are only interested in these)
+- **loginEndpoint**: https://accounts.google.com/o/oauth2/auth
+- **tokenEndpoint**: https://www.googleapis.com/oauth2/v3/token
+- **apiEndpoint**: https://www.googleapis.com/oauth2/v1/userinfo?alt=json
 
 
 REST Client artifact:
