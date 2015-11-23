@@ -15,7 +15,7 @@ import be.nabu.libs.services.api.DefinedService;
 import be.nabu.module.protocol.http.artifact.HTTPClientArtifact;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken" })
 public class OAuth2Configuration {
 	
 	private String clientId;
@@ -29,6 +29,7 @@ public class OAuth2Configuration {
 	private String serverPath;
 	private String errorPath, successPath;
 	private DefinedService authenticatorService;
+	private Boolean requireStateToken;
 
 	@NotNull
 	public String getClientId() {
@@ -128,4 +129,11 @@ public class OAuth2Configuration {
 		this.successPath = successPath;
 	}
 	
+	public Boolean getRequireStateToken() {
+		return requireStateToken;
+	}
+	public void setRequireStateToken(Boolean requireStateToken) {
+		this.requireStateToken = requireStateToken;
+	}
+
 }

@@ -35,7 +35,6 @@ import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.binding.api.Window;
 import be.nabu.libs.types.binding.json.JSONBinding;
 import be.nabu.libs.types.java.BeanResolver;
-import be.nabu.libs.types.structure.Structure;
 import be.nabu.utils.io.IOUtils;
 import be.nabu.utils.mime.api.ContentPart;
 import be.nabu.utils.mime.api.Header;
@@ -68,12 +67,13 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				);
 			}
 			else {
+				boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
 				Session session = artifact.getConfiguration().getWebArtifact().getSessionResolver().getSession(event.getContent().getHeaders());
 				if (session != null) {
 					String oauth2Token = (String) session.get(OAuth2.OAUTH2_TOKEN);
 					// check the token
 					if (oauth2Token != null) {
-						logger.debug("Checking csrf token for oauth2");
+						logger.debug("Checking csrf token for oauth2: " + oauth2Token);
 						if (!queryProperties.containsKey("state")) {
 							throw new HTTPException(400, "No csrf token found for oauth2 authentication");
 						}
@@ -81,6 +81,12 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							throw new HTTPException(400, "Possible csrf attack, the oauth2 token '" + oauth2Token + "' does not match the return state '" + queryProperties.get("state").get(0) + "'");
 						}
 					}
+					else if (mustValidateState) {
+						throw new HTTPException(400, "No oauth2 state token found in the session, can not validate");
+					}
+				}
+				else if (mustValidateState) {
+					throw new HTTPException(400, "No session found, can not validate oauth2 state token");
 				}
 				logger.debug("OAuth2 login successful, code retrieved");
 				String code = queryProperties.get("code").get(0);
