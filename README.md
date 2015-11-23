@@ -8,6 +8,7 @@ There are a couple of things that need to happen:
 
 1) Generating a redirect link and updating the user session with the csrf token. This can be done with the service `nabu.authentication.OAuth2.getRedirectLink`
 2) Register a listener that will catch the incoming redirect and transform the "code" to a "token", this can be done by creating a new artifact of the type `OAuth2 Provider`. Here you have to fill in the details for the specific provider:
+
 - **clientId**: public key for your application (gotten from provider)
 - **clientSecret**: a shared secret between you and the provider (never sent to frontend)
 - **scopes**: the scopes you are interested in requesting later on, they need to be included in the original request
