@@ -37,20 +37,20 @@ OAuth2 Artifact:
 
 REST Client artifact:
 
-- method: GET
-- path: /oauth2/v1/userinfo
-- requestHeaders: authorization. We use this to send "Authorization: Bearer <token>"
-- host: www.googleapis.com
-- secure: true
-- requestType: JSON
-- output: for the scopes "email" and "profile", a document that contains:
-	- id: a google id
-	- email: the email address for the user
-	- verified_email: whether or not the user was verified
-	- name: the (nick?) name for the user
-	- given_name: first name
-	- family_name: last name
-	- link: a google plus link to the profile
-	- picture: an avatar for the user
-	- gender: e.g. male
-	- locale: something like "nl"
+- **method**: GET
+- **path**: /oauth2/v1/userinfo
+- **requestHeaders**: authorization. We use this to send "Authorization: Bearer <token>"
+- **host**: www.googleapis.com
+- **secure**: true
+- **requestType**: JSON
+- **output**: for the scopes "email" and "profile", a document that contains:
+	- **id**: a google id
+	- **email**: the email address for the user
+	- **verified_email**: whether or not the user was verified
+	- **name**: the (nick?) name for the user
+	- **given_name**: first name
+	- **family_name**: last name
+	- **link**: a google plus link to the profile
+	- **picture**: an avatar for the user
+	- **gender**: e.g. male
+	- **locale**: something like "nl"
