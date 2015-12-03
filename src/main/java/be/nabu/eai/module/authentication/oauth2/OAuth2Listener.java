@@ -62,7 +62,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				if (artifact.getConfiguration().getErrorPath() == null) {
 					throw new HTTPException(500, "The login failed: " + queryProperties.get("error") + " - " + queryProperties.get("error_description"));
 				}
-				return new DefaultHTTPResponse(307, HTTPCodes.getMessage(307),
+				return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 					new PlainMimeEmptyPart(null, new MimeHeader("Location", artifact.getConfiguration().getErrorPath()))
 				);
 			}
@@ -154,7 +154,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webArtifactPath, null, secure, true));
 					responseHeaders.add(new MimeHeader("Location", artifact.getConfiguration().getSuccessPath()));
 					responseHeaders.add(new MimeHeader("Content-Length", "0"));
-					return new DefaultHTTPResponse(307, HTTPCodes.getMessage(307),
+					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 						new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
 					);
 				}
