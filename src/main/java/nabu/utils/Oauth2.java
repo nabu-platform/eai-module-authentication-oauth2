@@ -1,4 +1,4 @@
-package nabu.authentication;
+package nabu.utils;
 
 import java.io.IOException;
 import java.net.URI;
@@ -18,7 +18,7 @@ import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ExecutionContext;
 
 @WebService
-public class OAuth2 {
+public class Oauth2 {
 	
 	public static final String OAUTH2_TOKEN = "oauth2Token";
 	private ExecutionContext executionContext;

@@ -9,10 +9,10 @@ import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.InterfaceFilter;
+import be.nabu.eai.module.http.artifact.HTTPClientArtifact;
 import be.nabu.eai.repository.artifacts.web.WebArtifact;
 import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
-import be.nabu.module.protocol.http.artifact.HTTPClientArtifact;
 
 @XmlRootElement(name = "oAuth2")
 @XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken" })
