@@ -51,7 +51,7 @@
 		</dependency>
 		<dependency>
 			<groupId>nabu</groupId>
-			<artifactId>eai-module-protocol-http</artifactId>
+			<artifactId>eai-module-http</artifactId>
 			<version>1.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>

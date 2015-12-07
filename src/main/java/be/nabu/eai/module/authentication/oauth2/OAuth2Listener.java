@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 import nabu.authentication.OAuth2;
-import nabu.protocols.Http;
 import nabu.types.OAuth2Token;
+import nabu.utils.Http;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
