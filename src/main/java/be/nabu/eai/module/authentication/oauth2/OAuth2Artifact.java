@@ -16,21 +16,15 @@ import be.nabu.libs.resources.api.ResourceContainer;
 
 public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements StartableArtifact, StoppableArtifact {
 
-	private Repository repository;
 	private boolean started;
 	private List<EventSubscription<?, ?>> subscriptions = new ArrayList<EventSubscription<?, ?>>();
 	
 	public OAuth2Artifact(String id, ResourceContainer<?> directory, Repository repository) {
-		super(id, directory, "oauth2.xml", OAuth2Configuration.class);
-		this.repository = repository;
+		super(id, directory, repository, "oauth2.xml", OAuth2Configuration.class);
 	}
 	
 	public String getRelativePath() throws IOException {
 		return getConfiguration().getServerPath() == null ? "/oauth/" + getId() : (getConfiguration().getServerPath().startsWith("/") ? "" : "/") + getConfiguration().getServerPath();
-	}
-
-	public Repository getRepository() {
-		return repository;
 	}
 
 	@Override
