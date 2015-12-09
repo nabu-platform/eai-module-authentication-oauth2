@@ -103,12 +103,15 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						new MimeHeader("Content-Type", "application/x-www-form-urlencoded"),
 						new MimeHeader("Content-Length", Integer.valueOf(bytes.length).toString()))
 					);
+					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, true, true);
+					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
 					if (response.getCode() != 200) {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 					}
 					JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Token.class));
 					binding.setIgnoreUnknownElements(true);
+					logger.debug("Unmarshalling token response");
 					ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
 					OAuth2Authenticator proxy = POJOUtils.newProxy(
 						OAuth2Authenticator.class, 
@@ -117,10 +120,12 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						SystemPrincipal.ROOT,
 						artifact.getConfiguration().getAuthenticatorService() 
 					);
+					logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
 					TokenWithSecret token = proxy.authenticate(artifact.getId(), artifact.getConfiguration().getWebArtifact().getRealm(), TypeUtils.getAsBean(unmarshal, OAuth2Token.class, BeanResolver.getInstance()));
 					if (token == null) {
 						throw new HTTPException(500, "Login failed");
 					}
+					logger.debug("Authenticated as: " + token.getName());
 					List<Header> responseHeaders = new ArrayList<Header>();
 					String webArtifactPath = artifact.getConfiguration().getWebArtifact().getConfiguration().getPath() == null || artifact.getConfiguration().getWebArtifact().getConfiguration().getPath().isEmpty() ? "/" : artifact.getConfiguration().getWebArtifact().getConfiguration().getPath();
 					if (token.getSecret() != null) {
@@ -130,7 +135,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							// if there is no valid until in the token, set it to a year
 							token.getValidUntil() == null ? new Date(new Date().getTime() + 1000l*60*60*24*365) : token.getValidUntil(),
 							// path
-									webArtifactPath, 
+							webArtifactPath, 
 							// domain
 							null, 
 							// secure
@@ -139,6 +144,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							true
 						));
 					}
+					logger.debug("Creating new session");
 					// create a new session
 					Session newSession = artifact.getConfiguration().getWebArtifact().getSessionProvider().newSession();
 					// copy & destroy the old one (if any)
@@ -154,6 +160,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webArtifactPath, null, secure, true));
 					responseHeaders.add(new MimeHeader("Location", artifact.getConfiguration().getSuccessPath()));
 					responseHeaders.add(new MimeHeader("Content-Length", "0"));
+					logger.debug("Sending back 307");
 					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 						new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
 					);
@@ -164,10 +171,16 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			}
 		}
 		catch (HTTPException e) {
+			logger.error("Failed oauth2 authentication", e);
 			throw e;
 		}
 		catch (Exception e) {
+			logger.error("Failed oauth2 authentication", e);
 			throw new HTTPException(500, e);
+		}
+		catch(Error e) {
+			logger.error("Failed oauth2 authentication", e);
+			throw e;
 		}
 	}
 
