@@ -51,16 +51,17 @@ public class Oauth2 {
 			}
 		}
 		URI loginEndpoint = oauth2.getConfiguration().getLoginEndpoint();
-		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webArtifact.getConfiguration().getHosts().get(0) + ":" + httpServer.getConfiguration().getPort();
-		if (webArtifact.getConfiguration().getPath() == null || webArtifact.getConfiguration().getPath().isEmpty() || webArtifact.getConfiguration().getPath().equals("/")) {
-			redirectLink += "/";
+		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webArtifact.getConfiguration().getHosts().get(0) + ":" + httpServer.getConfiguration().getPort() + "/";
+		if (webArtifact.getConfiguration().getPath() != null && !webArtifact.getConfiguration().getPath().isEmpty() && !webArtifact.getConfiguration().getPath().equals("/")) {
+			redirectLink += webArtifact.getConfiguration().getPath().replaceFirst("^[/]+", "");
 		}
-		else {
-			redirectLink += (webArtifact.getConfiguration().getPath().startsWith("/") ? "" : "/") + webArtifact.getConfiguration().getPath();
+		if (oauth2.getRelativePath() != null) {
+			if (!redirectLink.endsWith("/")) {
+				redirectLink += "/";
+			}
+			redirectLink += oauth2.getRelativePath().replaceFirst("^[/]+", "");
 		}
-		redirectLink += oauth2.getRelativePath();
-		redirectLink = redirectLink.replace("//", "/");
-		
+
 		String endpoint = loginEndpoint.toString()
 			+ "?client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId())
 			+ "&scope=" + URIUtils.encodeURIComponent(builder.toString())
