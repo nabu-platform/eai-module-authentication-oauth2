@@ -69,12 +69,6 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>be.nabu.libs.http</groupId>
-			<artifactId>http-core</artifactId>
-			<version>1.1-SNAPSHOT</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<version>1.6.4</version>

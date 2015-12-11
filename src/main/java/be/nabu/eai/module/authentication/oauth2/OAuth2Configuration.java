@@ -8,6 +8,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
+import be.nabu.eai.api.EnvironmentSpecific;
 import be.nabu.eai.api.InterfaceFilter;
 import be.nabu.eai.module.http.artifact.HTTPClientArtifact;
 import be.nabu.eai.repository.artifacts.web.WebArtifact;
@@ -31,6 +32,7 @@ public class OAuth2Configuration {
 	private DefinedService authenticatorService;
 	private Boolean requireStateToken;
 
+	@EnvironmentSpecific
 	@NotNull
 	public String getClientId() {
 		return clientId;
@@ -39,6 +41,7 @@ public class OAuth2Configuration {
 		this.clientId = clientId;
 	}
 	
+	@EnvironmentSpecific
 	@NotNull
 	public String getClientSecret() {
 		return clientSecret;
@@ -63,6 +66,7 @@ public class OAuth2Configuration {
 		this.scopes = scopes;
 	}
 	
+	@EnvironmentSpecific
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	public HTTPClientArtifact getHttpClient() {
 		return httpClient;
