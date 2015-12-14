@@ -115,7 +115,6 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
 					OAuth2Authenticator proxy = POJOUtils.newProxy(
 						OAuth2Authenticator.class, 
-						artifact.getConfiguration().getWebArtifact().getServiceTracker(),
 						artifact.getRepository(),
 						SystemPrincipal.ROOT,
 						artifact.getConfiguration().getAuthenticatorService() 
