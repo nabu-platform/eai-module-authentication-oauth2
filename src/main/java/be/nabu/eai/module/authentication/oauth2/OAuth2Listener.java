@@ -13,6 +13,7 @@ import nabu.utils.Oauth2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import be.nabu.eai.module.authentication.oauth2.OAuth2Configuration.TokenResolverType;
 import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
 import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.authentication.api.TokenWithSecret;
@@ -36,9 +37,12 @@ import be.nabu.libs.types.binding.api.Window;
 import be.nabu.libs.types.binding.json.JSONBinding;
 import be.nabu.libs.types.java.BeanResolver;
 import be.nabu.utils.io.IOUtils;
+import be.nabu.utils.io.api.ByteBuffer;
+import be.nabu.utils.io.api.ReadableContainer;
 import be.nabu.utils.mime.api.ContentPart;
 import be.nabu.utils.mime.api.Header;
 import be.nabu.utils.mime.impl.MimeHeader;
+import be.nabu.utils.mime.impl.MimeUtils;
 import be.nabu.utils.mime.impl.PlainMimeContentPart;
 import be.nabu.utils.mime.impl.PlainMimeEmptyPart;
 
@@ -97,22 +101,68 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
 						+ "&redirect_uri=" + URIUtils.encodeURI(uri.toString().replaceAll("\\?.*", ""))
 						+ "&grant_type=authorization_code";
-					byte[] bytes = requestContent.getBytes("ASCII");
-					HTTPRequest request = new DefaultHTTPRequest("POST", artifact.getConfiguration().getTokenEndpoint().getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
-						new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
-						new MimeHeader("Content-Type", "application/x-www-form-urlencoded"),
-						new MimeHeader("Content-Length", Integer.valueOf(bytes.length).toString()))
-					);
+					HTTPRequest request;
+					// facebook uses GET logic
+					if (TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
+						logger.debug("Creating GET request for token request");
+						request = new DefaultHTTPRequest("GET", artifact.getConfiguration().getTokenEndpoint().getPath() + "?" + requestContent, new PlainMimeEmptyPart(null,  
+							new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
+							new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
+							new MimeHeader("Content-Length", "0")
+						));
+					}
+					// google (et al?) uses POST logic
+					else {
+						byte[] bytes = requestContent.getBytes("ASCII");
+						logger.debug("Creating POST request for token request");
+						request = new DefaultHTTPRequest("POST", artifact.getConfiguration().getTokenEndpoint().getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
+							new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
+							new MimeHeader("Content-Type", "application/x-www-form-urlencoded"),
+							new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
+							new MimeHeader("Content-Length", Integer.valueOf(bytes.length).toString())
+						));
+					}
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, true, true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
 					if (response.getCode() != 200) {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 					}
-					JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Token.class));
-					binding.setIgnoreUnknownElements(true);
-					logger.debug("Unmarshalling token response");
-					ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
+					String contentType = MimeUtils.getContentType(response.getContent().getHeaders());
+					logger.debug("Received content type: " + contentType);
+					OAuth2Token unmarshalled;
+					// facebook sends back text/plain...
+					if ("text/plain".equals(contentType)) {
+						ReadableContainer<ByteBuffer> readable = ((ContentPart) response.getContent()).getReadable();
+						try {
+							byte [] content = IOUtils.toBytes(readable);
+							logger.debug("Received content: " + new String(content, "ASCII"));
+							Map<String, List<String>> returnedParameters = URIUtils.getQueryProperties(new URI("?" + new String(content, "ASCII")));
+							unmarshalled = new OAuth2Token();
+							if (returnedParameters.get("access_token") == null || returnedParameters.get("access_token").isEmpty()) {
+								throw new HTTPException(500, "Could not find access_token in the returned content: " + new String(content));
+							}
+							unmarshalled.setAccessToken(returnedParameters.get("access_token").get(0));
+							if (returnedParameters.get("expires") != null && !returnedParameters.get("expires").isEmpty()) {
+								unmarshalled.setExpiresIn(Integer.parseInt(returnedParameters.get("expires").get(0)));
+							}
+						}
+						finally {
+							readable.close();
+						}
+					}
+					// normally it should be json though
+					else {
+						JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Token.class));
+						binding.setIgnoreUnknownElements(true);
+						logger.debug("Unmarshalling token response");
+						if (logger.isTraceEnabled()) {
+							logger.trace("Token response: " + new String(IOUtils.toBytes(((ContentPart) response.getContent()).getReadable())));
+						}
+						ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
+						unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2Token.class, BeanResolver.getInstance());
+					}
+					logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
 					OAuth2Authenticator proxy = POJOUtils.newProxy(
 						OAuth2Authenticator.class, 
 						artifact.getRepository(),
@@ -120,7 +170,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						artifact.getConfiguration().getAuthenticatorService() 
 					);
 					logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-					TokenWithSecret token = proxy.authenticate(artifact.getId(), artifact.getConfiguration().getWebArtifact().getRealm(), TypeUtils.getAsBean(unmarshal, OAuth2Token.class, BeanResolver.getInstance()));
+					TokenWithSecret token = proxy.authenticate(artifact.getId(), artifact.getConfiguration().getWebArtifact().getRealm(), unmarshalled);
 					if (token == null) {
 						throw new HTTPException(500, "Login failed");
 					}

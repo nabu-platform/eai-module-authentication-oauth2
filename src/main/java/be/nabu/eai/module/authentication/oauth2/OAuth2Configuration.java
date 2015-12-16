@@ -16,8 +16,13 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
 public class OAuth2Configuration {
+	
+	public enum TokenResolverType {
+		POST,
+		GET
+	}
 	
 	private String clientId;
 	private String clientSecret;
@@ -31,6 +36,7 @@ public class OAuth2Configuration {
 	private String errorPath, successPath;
 	private DefinedService authenticatorService;
 	private Boolean requireStateToken;
+	private TokenResolverType tokenResolvingType;
 
 	@EnvironmentSpecific
 	@NotNull
@@ -138,6 +144,13 @@ public class OAuth2Configuration {
 	}
 	public void setRequireStateToken(Boolean requireStateToken) {
 		this.requireStateToken = requireStateToken;
+	}
+	
+	public TokenResolverType getTokenResolvingType() {
+		return tokenResolvingType;
+	}
+	public void setTokenResolvingType(TokenResolverType tokenResolvingType) {
+		this.tokenResolvingType = tokenResolvingType;
 	}
 
 }
