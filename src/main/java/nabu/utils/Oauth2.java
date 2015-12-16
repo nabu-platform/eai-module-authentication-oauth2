@@ -51,6 +51,10 @@ public class Oauth2 {
 			}
 		}
 		URI loginEndpoint = oauth2.getConfiguration().getLoginEndpoint();
+		if (loginEndpoint == null) {
+			return null;
+		}
+		
 		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webArtifact.getConfiguration().getHosts().get(0) + ":" + httpServer.getConfiguration().getPort() + "/";
 		if (webArtifact.getConfiguration().getPath() != null && !webArtifact.getConfiguration().getPath().isEmpty() && !webArtifact.getConfiguration().getPath().equals("/")) {
 			redirectLink += webArtifact.getConfiguration().getPath().replaceFirst("^[/]+", "");
