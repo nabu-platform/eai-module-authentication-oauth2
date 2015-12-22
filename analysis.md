@@ -113,3 +113,5 @@ The url: `https://www.linkedin.com/uas/oauth2/accessToken`
 This should also be a POST request that is form encoded.
 
 Note that the bearer header also seems supported.
+
+More information: https://developer-programs.linkedin.com/documents/profile-api
