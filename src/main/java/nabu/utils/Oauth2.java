@@ -34,10 +34,10 @@ public class Oauth2 {
 		if (webArtifact == null) {
 			throw new IllegalStateException("No web artifact found");
 		}
-		else if (webArtifact.getConfiguration().getHosts() == null || webArtifact.getConfiguration().getHosts().isEmpty()) {
-			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host(s) in the web artifact");
+		else if (webArtifact.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
+			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
 		}
-		DefinedHTTPServer httpServer = webArtifact.getConfiguration().getHttpServer();
+		DefinedHTTPServer httpServer = webArtifact.getConfiguration().getVirtualHost().getConfiguration().getServer();
 		if (httpServer == null) {
 			throw new IllegalStateException("No http server found");
 		}
@@ -55,7 +55,7 @@ public class Oauth2 {
 			return null;
 		}
 		
-		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webArtifact.getConfiguration().getHosts().get(0) + ":" + httpServer.getConfiguration().getPort() + "/";
+		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webArtifact.getConfiguration().getVirtualHost().getConfiguration().getHost() + ":" + httpServer.getConfiguration().getPort() + "/";
 		if (webArtifact.getConfiguration().getPath() != null && !webArtifact.getConfiguration().getPath().isEmpty() && !webArtifact.getConfiguration().getPath().equals("/")) {
 			redirectLink += webArtifact.getConfiguration().getPath().replaceFirst("^[/]+", "");
 		}

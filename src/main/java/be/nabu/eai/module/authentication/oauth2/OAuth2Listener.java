@@ -58,7 +58,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 	@Override
 	public HTTPResponse handle(HTTPRequest event) {
 		try {
-			boolean secure = artifact.getConfiguration().getWebArtifact().getConfiguration().getHttpServer().getConfiguration().getKeystore() != null;
+			boolean secure = artifact.getConfiguration().getWebArtifact().getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
 			URI uri = HTTPUtils.getURI(event, secure);
 			Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
 			if (queryProperties.containsKey("error") || !queryProperties.containsKey("code")) {

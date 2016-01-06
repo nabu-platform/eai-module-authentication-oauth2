@@ -47,10 +47,12 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 		if (getConfiguration().getServerPath() != null && !getConfiguration().getServerPath().isEmpty()) {
 			artifactPath += (getConfiguration().getServerPath().startsWith("/") ? "" : "/") + getConfiguration().getServerPath();
 		}
-		EventSubscription<HTTPRequest, HTTPResponse> subscription = getConfiguration().getWebArtifact().getDispatcher().subscribe(HTTPRequest.class, new OAuth2Listener(this));
-		subscription.filter(HTTPServerUtils.limitToPath(artifactPath));
-		subscriptions.add(subscription);
-		started = true;
+		if (getConfiguration().getWebArtifact().getConfiguration().getVirtualHost() != null) {
+			EventSubscription<HTTPRequest, HTTPResponse> subscription = getConfiguration().getWebArtifact().getConfiguration().getVirtualHost().getDispatcher().subscribe(HTTPRequest.class, new OAuth2Listener(this));
+			subscription.filter(HTTPServerUtils.limitToPath(artifactPath));
+			subscriptions.add(subscription);
+			started = true;
+		}
 	}
 
 	@Override
