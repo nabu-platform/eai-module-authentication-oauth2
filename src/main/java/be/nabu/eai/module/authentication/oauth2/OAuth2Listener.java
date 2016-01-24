@@ -6,9 +6,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import nabu.types.OAuth2Token;
-import nabu.utils.Http;
-import nabu.utils.Oauth2;
+import nabu.authentication.oauth2.Services;
+import nabu.authentication.oauth2.types.OAuth2Token;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +73,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
 				Session session = artifact.getConfiguration().getWebArtifact().getSessionResolver().getSession(event.getContent().getHeaders());
 				if (session != null) {
-					String oauth2Token = (String) session.get(Oauth2.OAUTH2_TOKEN);
+					String oauth2Token = (String) session.get(Services.OAUTH2_TOKEN);
 					// check the token
 					if (oauth2Token != null) {
 						logger.debug("Checking csrf token for oauth2: " + oauth2Token);
@@ -94,7 +93,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				}
 				logger.debug("OAuth2 login successful, code retrieved");
 				String code = queryProperties.get("code").get(0);
-				DefaultHTTPClient newClient = Http.newClient(artifact.getConfiguration().getHttpClient());
+				DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
 					String requestContent = "code=" + URIUtils.encodeURIComponent(code) 
 						+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())

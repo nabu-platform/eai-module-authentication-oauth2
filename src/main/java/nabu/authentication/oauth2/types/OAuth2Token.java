@@ -1,4 +1,4 @@
-package nabu.types;
+package nabu.authentication.oauth2.types;
 
 import javax.xml.bind.annotation.XmlElement;
 
