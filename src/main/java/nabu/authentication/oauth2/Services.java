@@ -10,8 +10,8 @@ import javax.jws.WebService;
 import javax.validation.constraints.NotNull;
 
 import be.nabu.eai.module.authentication.oauth2.OAuth2Artifact;
+import be.nabu.eai.module.http.server.HTTPServerArtifact;
 import be.nabu.eai.module.web.application.WebApplication;
-import be.nabu.eai.repository.artifacts.http.DefinedHTTPServer;
 import be.nabu.libs.http.api.server.Session;
 import be.nabu.libs.resources.URIUtils;
 import be.nabu.libs.services.ServiceRuntime;
@@ -37,7 +37,7 @@ public class Services {
 		else if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
 			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
 		}
-		DefinedHTTPServer httpServer = webApplication.getConfiguration().getVirtualHost().getConfiguration().getServer();
+		HTTPServerArtifact httpServer = webApplication.getConfiguration().getVirtualHost().getConfiguration().getServer();
 		if (httpServer == null) {
 			throw new IllegalStateException("No http server found");
 		}

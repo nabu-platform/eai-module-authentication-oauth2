@@ -57,6 +57,12 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
+			<groupId>nabu</groupId>
+			<artifactId>eai-module-http-server</artifactId>
+			<version>1.0-SNAPSHOT</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>be.nabu.eai</groupId>
 			<artifactId>eai-developer</artifactId>
 			<version>1.0-SNAPSHOT</version>
