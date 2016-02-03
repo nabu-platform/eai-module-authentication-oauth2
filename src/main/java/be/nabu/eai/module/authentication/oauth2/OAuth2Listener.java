@@ -57,7 +57,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 	@Override
 	public HTTPResponse handle(HTTPRequest event) {
 		try {
-			boolean secure = artifact.getConfiguration().getWebArtifact().getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
+			boolean secure = artifact.getConfiguration().getWebApplication().getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
 			URI uri = HTTPUtils.getURI(event, secure);
 			Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
 			if (queryProperties.containsKey("error") || !queryProperties.containsKey("code")) {
@@ -71,7 +71,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			}
 			else {
 				boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
-				Session session = artifact.getConfiguration().getWebArtifact().getSessionResolver().getSession(event.getContent().getHeaders());
+				Session session = artifact.getConfiguration().getWebApplication().getSessionResolver().getSession(event.getContent().getHeaders());
 				if (session != null) {
 					String oauth2Token = (String) session.get(Services.OAUTH2_TOKEN);
 					// check the token
@@ -169,21 +169,21 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						artifact.getConfiguration().getAuthenticatorService() 
 					);
 					logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-					TokenWithSecret token = proxy.authenticate(artifact.getId(), artifact.getConfiguration().getWebArtifact().getRealm(), unmarshalled);
+					TokenWithSecret token = proxy.authenticate(artifact.getId(), artifact.getConfiguration().getWebApplication().getRealm(), unmarshalled);
 					if (token == null) {
 						throw new HTTPException(500, "Login failed");
 					}
 					logger.debug("Authenticated as: " + token.getName());
 					List<Header> responseHeaders = new ArrayList<Header>();
-					String webArtifactPath = artifact.getConfiguration().getWebArtifact().getConfiguration().getPath() == null || artifact.getConfiguration().getWebArtifact().getConfiguration().getPath().isEmpty() ? "/" : artifact.getConfiguration().getWebArtifact().getConfiguration().getPath();
+					String webApplicationPath = artifact.getConfiguration().getWebApplication().getConfiguration().getPath() == null || artifact.getConfiguration().getWebApplication().getConfiguration().getPath().isEmpty() ? "/" : artifact.getConfiguration().getWebApplication().getConfiguration().getPath();
 					if (token.getSecret() != null) {
 						responseHeaders.add(HTTPUtils.newSetCookieHeader(
-							"Realm-" + artifact.getConfiguration().getWebArtifact().getRealm(), 
+							"Realm-" + artifact.getConfiguration().getWebApplication().getRealm(), 
 							token.getName() + "/" + ((TokenWithSecret) token).getSecret(), 
 							// if there is no valid until in the token, set it to a year
 							token.getValidUntil() == null ? new Date(new Date().getTime() + 1000l*60*60*24*365) : token.getValidUntil(),
 							// path
-							webArtifactPath, 
+							webApplicationPath, 
 							// domain
 							null, 
 							// secure
@@ -194,7 +194,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					}
 					logger.debug("Creating new session");
 					// create a new session
-					Session newSession = artifact.getConfiguration().getWebArtifact().getSessionProvider().newSession();
+					Session newSession = artifact.getConfiguration().getWebApplication().getSessionProvider().newSession();
 					// copy & destroy the old one (if any)
 					if (session != null) {
 						for (String key : session) {
@@ -203,9 +203,9 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						session.destroy();
 					}
 					// set the token in the session
-					newSession.set(GlueListener.buildTokenName(artifact.getConfiguration().getWebArtifact().getRealm()), token);
+					newSession.set(GlueListener.buildTokenName(artifact.getConfiguration().getWebApplication().getRealm()), token);
 					// set the correct headers to update the session
-					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webArtifactPath, null, secure, true));
+					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
 					responseHeaders.add(new MimeHeader("Location", artifact.getConfiguration().getSuccessPath()));
 					responseHeaders.add(new MimeHeader("Content-Length", "0"));
 					logger.debug("Sending back 307");

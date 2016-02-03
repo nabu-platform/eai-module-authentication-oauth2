@@ -10,8 +10,8 @@ import javax.jws.WebService;
 import javax.validation.constraints.NotNull;
 
 import be.nabu.eai.module.authentication.oauth2.OAuth2Artifact;
+import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.repository.artifacts.http.DefinedHTTPServer;
-import be.nabu.eai.repository.artifacts.web.WebArtifact;
 import be.nabu.libs.http.api.server.Session;
 import be.nabu.libs.resources.URIUtils;
 import be.nabu.libs.services.ServiceRuntime;
@@ -30,14 +30,14 @@ public class Services {
 		if (oauth2 == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
-		WebArtifact webArtifact = oauth2.getConfiguration().getWebArtifact();
-		if (webArtifact == null) {
+		WebApplication webApplication = oauth2.getConfiguration().getWebApplication();
+		if (webApplication == null) {
 			throw new IllegalStateException("No web artifact found");
 		}
-		else if (webArtifact.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
+		else if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
 			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
 		}
-		DefinedHTTPServer httpServer = webArtifact.getConfiguration().getVirtualHost().getConfiguration().getServer();
+		DefinedHTTPServer httpServer = webApplication.getConfiguration().getVirtualHost().getConfiguration().getServer();
 		if (httpServer == null) {
 			throw new IllegalStateException("No http server found");
 		}
@@ -55,9 +55,9 @@ public class Services {
 			return null;
 		}
 		
-		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webArtifact.getConfiguration().getVirtualHost().getConfiguration().getHost() + ":" + httpServer.getConfiguration().getPort() + "/";
-		if (webArtifact.getConfiguration().getPath() != null && !webArtifact.getConfiguration().getPath().isEmpty() && !webArtifact.getConfiguration().getPath().equals("/")) {
-			redirectLink += webArtifact.getConfiguration().getPath().replaceFirst("^[/]+", "");
+		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() + ":" + httpServer.getConfiguration().getPort() + "/";
+		if (webApplication.getConfiguration().getPath() != null && !webApplication.getConfiguration().getPath().isEmpty() && !webApplication.getConfiguration().getPath().equals("/")) {
+			redirectLink += webApplication.getConfiguration().getPath().replaceFirst("^[/]+", "");
 		}
 		if (oauth2.getRelativePath() != null) {
 			if (!redirectLink.endsWith("/")) {

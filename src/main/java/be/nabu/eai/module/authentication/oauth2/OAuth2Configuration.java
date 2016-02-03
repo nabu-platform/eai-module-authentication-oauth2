@@ -3,6 +3,7 @@ package be.nabu.eai.module.authentication.oauth2;
 import java.net.URI;
 import java.util.List;
 
+import be.nabu.eai.module.web.application.WebApplication;
 import javax.validation.constraints.NotNull;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
@@ -10,13 +11,12 @@ import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.EnvironmentSpecific;
 import be.nabu.eai.api.InterfaceFilter;
-import be.nabu.eai.module.http.artifact.HTTPClientArtifact;
-import be.nabu.eai.repository.artifacts.web.WebArtifact;
+import be.nabu.eai.module.http.client.HTTPClientArtifact;
 import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webArtifact", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webApplication", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -31,7 +31,7 @@ public class OAuth2Configuration {
 	private URI tokenEndpoint;
 	private URI apiEndpoint;
 	private HTTPClientArtifact httpClient;
-	private WebArtifact webArtifact;
+	private WebApplication webApplication;
 	private String serverPath;
 	private String errorPath, successPath;
 	private DefinedService authenticatorService;
@@ -83,11 +83,11 @@ public class OAuth2Configuration {
 	
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@NotNull
-	public WebArtifact getWebArtifact() {
-		return webArtifact;
+	public WebApplication getWebApplication() {
+		return webApplication;
 	}
-	public void setWebArtifact(WebArtifact webArtifact) {
-		this.webArtifact = webArtifact;
+	public void setWebApplication(WebApplication webApplication) {
+		this.webApplication = webApplication;
 	}
 	
 	@NotNull

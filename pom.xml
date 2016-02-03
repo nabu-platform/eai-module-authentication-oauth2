@@ -52,7 +52,7 @@
 		</dependency>
 		<dependency>
 			<groupId>nabu</groupId>
-			<artifactId>eai-module-http</artifactId>
+			<artifactId>eai-module-http-client</artifactId>
 			<version>1.0-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>
@@ -70,7 +70,7 @@
 		</dependency>
 		<dependency>
 			<groupId>nabu</groupId>
-			<artifactId>eai-module-web</artifactId>
+			<artifactId>eai-module-web-application</artifactId>
 			<version>1.0-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>

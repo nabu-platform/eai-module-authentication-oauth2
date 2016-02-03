@@ -40,15 +40,15 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 
 	@Override
 	public void start() throws IOException {
-		String artifactPath = getConfiguration().getWebArtifact().getConfiguration().getPath() == null || getConfiguration().getWebArtifact().getConfiguration().getPath().isEmpty() ? "/" : getConfiguration().getWebArtifact().getConfiguration().getPath();
+		String artifactPath = getConfiguration().getWebApplication().getConfiguration().getPath() == null || getConfiguration().getWebApplication().getConfiguration().getPath().isEmpty() ? "/" : getConfiguration().getWebApplication().getConfiguration().getPath();
 		if (artifactPath.endsWith("/")) {
 			artifactPath = artifactPath.substring(0, artifactPath.length() - 1);
 		}
 		if (getConfiguration().getServerPath() != null && !getConfiguration().getServerPath().isEmpty()) {
 			artifactPath += (getConfiguration().getServerPath().startsWith("/") ? "" : "/") + getConfiguration().getServerPath();
 		}
-		if (getConfiguration().getWebArtifact().getConfiguration().getVirtualHost() != null) {
-			EventSubscription<HTTPRequest, HTTPResponse> subscription = getConfiguration().getWebArtifact().getConfiguration().getVirtualHost().getDispatcher().subscribe(HTTPRequest.class, new OAuth2Listener(this));
+		if (getConfiguration().getWebApplication().getConfiguration().getVirtualHost() != null) {
+			EventSubscription<HTTPRequest, HTTPResponse> subscription = getConfiguration().getWebApplication().getConfiguration().getVirtualHost().getDispatcher().subscribe(HTTPRequest.class, new OAuth2Listener(this));
 			subscription.filter(HTTPServerUtils.limitToPath(artifactPath));
 			subscriptions.add(subscription);
 			started = true;
