@@ -12,7 +12,7 @@ import be.nabu.libs.property.api.Value;
 public class OAuth2GUIManager extends BaseJAXBGUIManager<OAuth2Configuration, OAuth2Artifact> {
 
 	public OAuth2GUIManager() {
-		super("OAuth2 Provider", OAuth2Artifact.class, new OAuth2Manager(), OAuth2Configuration.class);
+		super("OAuth2 Client", OAuth2Artifact.class, new OAuth2Manager(), OAuth2Configuration.class);
 	}
 
 	@Override
