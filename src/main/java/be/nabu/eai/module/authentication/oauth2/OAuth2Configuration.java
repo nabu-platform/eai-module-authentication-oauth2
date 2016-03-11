@@ -3,7 +3,6 @@ package be.nabu.eai.module.authentication.oauth2;
 import java.net.URI;
 import java.util.List;
 
-import be.nabu.eai.module.web.application.WebApplication;
 import javax.validation.constraints.NotNull;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
@@ -16,7 +15,7 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "webApplication", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -31,7 +30,6 @@ public class OAuth2Configuration {
 	private URI tokenEndpoint;
 	private URI apiEndpoint;
 	private HTTPClientArtifact httpClient;
-	private WebApplication webApplication;
 	private String serverPath;
 	private String errorPath, successPath;
 	private DefinedService authenticatorService;
@@ -79,15 +77,6 @@ public class OAuth2Configuration {
 	}
 	public void setHttpClient(HTTPClientArtifact httpClient) {
 		this.httpClient = httpClient;
-	}
-	
-	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
-	@NotNull
-	public WebApplication getWebApplication() {
-		return webApplication;
-	}
-	public void setWebApplication(WebApplication webApplication) {
-		this.webApplication = webApplication;
 	}
 	
 	@NotNull

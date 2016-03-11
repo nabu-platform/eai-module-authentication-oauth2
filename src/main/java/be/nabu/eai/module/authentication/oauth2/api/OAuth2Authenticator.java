@@ -2,7 +2,7 @@ package be.nabu.eai.module.authentication.oauth2.api;
 
 import javax.jws.WebParam;
 
-import nabu.authentication.oauth2.types.OAuth2Token;
+import nabu.authentication.oauth2.server.types.OAuth2Token;
 import be.nabu.libs.authentication.api.TokenWithSecret;
 
 public interface OAuth2Authenticator {

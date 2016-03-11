@@ -1,4 +1,4 @@
-package nabu.authentication.oauth2;
+package nabu.authentication.oauth2.server;
 
 import java.io.IOException;
 import java.net.URI;
@@ -25,14 +25,14 @@ public class Services {
 	private ServiceRuntime runtime;
 	
 	@WebResult(name = "link")
-	public String getRedirectLink(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId) throws IOException {
+	public String getRedirectLink(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId) throws IOException {
 		OAuth2Artifact oauth2 = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (oauth2 == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
-		WebApplication webApplication = oauth2.getConfiguration().getWebApplication();
+		WebApplication webApplication = executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
 		if (webApplication == null) {
-			throw new IllegalStateException("No web artifact found");
+			throw new IllegalStateException("Can not find web application: " + webApplicationId);
 		}
 		else if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
 			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
