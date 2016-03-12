@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import nabu.authentication.oauth2.server.Services;
-import nabu.authentication.oauth2.server.types.OAuth2Token;
+import nabu.authentication.oauth2.server.types.OAuth2Identity;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +17,7 @@ import be.nabu.eai.module.authentication.oauth2.OAuth2Configuration.TokenResolve
 import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.repository.util.SystemPrincipal;
+import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.authentication.api.TokenWithSecret;
 import be.nabu.libs.events.api.EventHandler;
 import be.nabu.libs.http.HTTPCodes;
@@ -68,7 +69,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		if (childPath != null) {
 			path += "/" + childPath;
 		}
-		return path.replace("//", "/");
+		return path.replaceAll("[/]{2,}", "/");
 	}
 	
 	@Override
@@ -146,7 +147,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					}
 					String contentType = MimeUtils.getContentType(response.getContent().getHeaders());
 					logger.debug("Received content type: " + contentType);
-					OAuth2Token unmarshalled;
+					OAuth2Identity unmarshalled;
 					// facebook sends back text/plain...
 					if ("text/plain".equals(contentType)) {
 						ReadableContainer<ByteBuffer> readable = ((ContentPart) response.getContent()).getReadable();
@@ -154,7 +155,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							byte [] content = IOUtils.toBytes(readable);
 							logger.debug("Received content: " + new String(content, "ASCII"));
 							Map<String, List<String>> returnedParameters = URIUtils.getQueryProperties(new URI("?" + new String(content, "ASCII")));
-							unmarshalled = new OAuth2Token();
+							unmarshalled = new OAuth2Identity();
 							if (returnedParameters.get("access_token") == null || returnedParameters.get("access_token").isEmpty()) {
 								throw new HTTPException(500, "Could not find access_token in the returned content: " + new String(content));
 							}
@@ -169,31 +170,38 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					}
 					// normally it should be json though
 					else {
-						JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Token.class));
+						JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Identity.class));
 						binding.setIgnoreUnknownElements(true);
 						logger.debug("Unmarshalling token response");
 						if (logger.isTraceEnabled()) {
 							logger.trace("Token response: " + new String(IOUtils.toBytes(((ContentPart) response.getContent()).getReadable())));
 						}
 						ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
-						unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2Token.class, BeanResolver.getInstance());
+						unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2Identity.class, BeanResolver.getInstance());
 					}
 					logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
-					OAuth2Authenticator proxy = POJOUtils.newProxy(
-						OAuth2Authenticator.class, 
-						artifact.getRepository(),
-						SystemPrincipal.ROOT,
-						artifact.getConfiguration().getAuthenticatorService() 
-					);
-					logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-					TokenWithSecret token = proxy.authenticate(artifact.getId(), application.getRealm(), unmarshalled);
-					if (token == null) {
-						throw new HTTPException(500, "Login failed");
+					Token token = null;
+					// if we don't want to map it to an internal representation of the user, send it back as is
+					if (artifact.getConfiguration().getAuthenticatorService() == null) {
+						token = new OAuth2Token(unmarshalled, application.getRealm());
 					}
-					logger.debug("Authenticated as: " + token.getName());
+					else {
+						OAuth2Authenticator proxy = POJOUtils.newProxy(
+							OAuth2Authenticator.class, 
+							artifact.getRepository(),
+							SystemPrincipal.ROOT,
+							artifact.getConfiguration().getAuthenticatorService() 
+						);
+						logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
+						token = proxy.authenticate(artifact.getId(), application.getRealm(), unmarshalled);
+						if (token == null) {
+							throw new HTTPException(500, "Login failed");
+						}
+						logger.debug("Natively authenticated as: " + token.getName());
+					}
 					List<Header> responseHeaders = new ArrayList<Header>();
 					String webApplicationPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
-					if (token.getSecret() != null) {
+					if (token instanceof TokenWithSecret && ((TokenWithSecret) token).getSecret() != null) {
 						responseHeaders.add(HTTPUtils.newSetCookieHeader(
 							"Realm-" + application.getRealm(), 
 							token.getName() + "/" + ((TokenWithSecret) token).getSecret(), 

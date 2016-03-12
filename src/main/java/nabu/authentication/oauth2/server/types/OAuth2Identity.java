@@ -2,7 +2,7 @@ package nabu.authentication.oauth2.server.types;
 
 import javax.xml.bind.annotation.XmlElement;
 
-public class OAuth2Token {
+public class OAuth2Identity {
 	
 	private String accessToken, tokenType;
 	private Integer expiresIn;
