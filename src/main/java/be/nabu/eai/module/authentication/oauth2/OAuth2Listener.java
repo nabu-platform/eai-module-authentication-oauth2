@@ -62,6 +62,10 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 	}
 	
 	private String getFullPath(String childPath) throws IOException {
+		// it is already an absolute path
+		if (childPath.startsWith("http://") || childPath.startsWith("https://")) {
+			return childPath;
+		}
 		String path = application.getConfiguration().getPath() == null ? "/" : application.getConfiguration().getPath();
 		if (this.path != null) {
 			path += "/" + this.path;
@@ -69,7 +73,11 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		if (childPath != null) {
 			path += "/" + childPath;
 		}
-		return path.replaceAll("[/]{2,}", "/");
+		path = path.replaceAll("[/]{2,}", "/");
+		String host = application.getConfiguration().getVirtualHost().getConfiguration().getHost();
+		Integer port = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getPort();
+		boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
+		return (secure ? "https://" : "http://") + host + (port == null ? "" : ":" + port) + (path.startsWith("/") ? "" : "/") + path;
 	}
 	
 	@Override
