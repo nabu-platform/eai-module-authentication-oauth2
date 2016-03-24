@@ -54,8 +54,19 @@ public class Services {
 		if (loginEndpoint == null) {
 			return null;
 		}
+
+		Integer port = httpServer.getConfiguration().getPort();
+		if (port != null) {
+			// if the port is the default port, don't include it
+			if (port == 443 && httpServer.getConfiguration().getKeystore() != null) {
+				port = null;
+			}
+			else if (port == 80 && httpServer.getConfiguration().getKeystore() == null) {
+				port = null;
+			}
+		}
 		
-		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() + ":" + httpServer.getConfiguration().getPort() + "/";
+		String redirectLink = (httpServer.getConfiguration().getKeystore() != null ? "https" : "http") + "://" + webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() + (port == null ? "" : ":" + port) + "/";
 		if (webApplication.getConfiguration().getPath() != null && !webApplication.getConfiguration().getPath().isEmpty() && !webApplication.getConfiguration().getPath().equals("/")) {
 			redirectLink += webApplication.getConfiguration().getPath().replaceFirst("^[/]+", "");
 		}
