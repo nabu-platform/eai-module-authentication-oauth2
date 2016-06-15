@@ -15,7 +15,7 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -25,6 +25,11 @@ public class OAuth2Configuration {
 	
 	private String clientId;
 	private String clientSecret;
+	/**
+	 * Microsoft requires a resource to be passed along in the code-to-token part of the request (https://dev.onedrive.com/auth/aad_oauth.htm)
+	 * For example: https://api.office.com/discovery/
+	 */
+	private String resource;
 	private List<String> scopes;
 	private URI loginEndpoint;
 	private URI tokenEndpoint;
@@ -52,6 +57,13 @@ public class OAuth2Configuration {
 	}
 	public void setClientSecret(String clientSecret) {
 		this.clientSecret = clientSecret;
+	}
+	
+	public String getResource() {
+		return resource;
+	}
+	public void setResource(String resource) {
+		this.resource = resource;
 	}
 	
 	@NotNull

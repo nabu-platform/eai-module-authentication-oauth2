@@ -1,13 +1,17 @@
 package be.nabu.eai.module.authentication.oauth2;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import nabu.authentication.oauth2.server.Services;
+import nabu.authentication.oauth2.server.Services.GrantType;
 import nabu.authentication.oauth2.server.types.OAuth2Identity;
 
 import org.slf4j.Logger;
@@ -51,7 +55,7 @@ import be.nabu.utils.mime.impl.PlainMimeEmptyPart;
 public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 
 	private OAuth2Artifact artifact;
-	private Logger logger = LoggerFactory.getLogger(getClass());
+	private static Logger logger = LoggerFactory.getLogger(OAuth2Listener.class);
 	private WebApplication application;
 	private String path;
 
@@ -121,72 +125,14 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					String requestContent = "code=" + URIUtils.encodeURIComponent(code) 
-						+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())
-						+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
-						+ "&redirect_uri=" + URIUtils.encodeURI(uri.toString().replaceAll("\\?.*", ""))
-						+ "&grant_type=authorization_code";
-					HTTPRequest request;
-					// facebook uses GET logic
-					if (TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
-						logger.debug("Creating GET request for token request");
-						request = new DefaultHTTPRequest("GET", artifact.getConfiguration().getTokenEndpoint().getPath() + "?" + requestContent, new PlainMimeEmptyPart(null,  
-							new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
-							new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
-							new MimeHeader("Content-Length", "0")
-						));
-					}
-					// google (et al?) uses POST logic
-					else {
-						byte[] bytes = requestContent.getBytes("ASCII");
-						logger.debug("Creating POST request for token request");
-						request = new DefaultHTTPRequest("POST", artifact.getConfiguration().getTokenEndpoint().getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
-							new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
-							new MimeHeader("Content-Type", "application/x-www-form-urlencoded"),
-							new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
-							new MimeHeader("Content-Length", Integer.valueOf(bytes.length).toString())
-						));
-					}
+					HTTPRequest request = buildTokenRequest(artifact, uri, code, GrantType.AUTHORIZATION);
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, true, true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
 					if (response.getCode() != 200) {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 					}
-					String contentType = MimeUtils.getContentType(response.getContent().getHeaders());
-					logger.debug("Received content type: " + contentType);
-					OAuth2Identity unmarshalled;
-					// facebook sends back text/plain...
-					if ("text/plain".equals(contentType)) {
-						ReadableContainer<ByteBuffer> readable = ((ContentPart) response.getContent()).getReadable();
-						try {
-							byte [] content = IOUtils.toBytes(readable);
-							logger.debug("Received content: " + new String(content, "ASCII"));
-							Map<String, List<String>> returnedParameters = URIUtils.getQueryProperties(new URI("?" + new String(content, "ASCII")));
-							unmarshalled = new OAuth2Identity();
-							if (returnedParameters.get("access_token") == null || returnedParameters.get("access_token").isEmpty()) {
-								throw new HTTPException(500, "Could not find access_token in the returned content: " + new String(content));
-							}
-							unmarshalled.setAccessToken(returnedParameters.get("access_token").get(0));
-							if (returnedParameters.get("expires") != null && !returnedParameters.get("expires").isEmpty()) {
-								unmarshalled.setExpiresIn(Integer.parseInt(returnedParameters.get("expires").get(0)));
-							}
-						}
-						finally {
-							readable.close();
-						}
-					}
-					// normally it should be json though
-					else {
-						JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Identity.class));
-						binding.setIgnoreUnknownElements(true);
-						logger.debug("Unmarshalling token response");
-						if (logger.isTraceEnabled()) {
-							logger.trace("Token response: " + new String(IOUtils.toBytes(((ContentPart) response.getContent()).getReadable())));
-						}
-						ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
-						unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2Identity.class, BeanResolver.getInstance());
-					}
+					OAuth2Identity unmarshalled = getIdentityFromResponse(response);
 					logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
 					Token token = null;
 					// if we don't want to map it to an internal representation of the user, send it back as is
@@ -263,6 +209,83 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			logger.error("Failed oauth2 authentication", e);
 			throw e;
 		}
+	}
+
+	public static OAuth2Identity getIdentityFromResponse(HTTPResponse response) throws IOException, UnsupportedEncodingException, URISyntaxException, ParseException {
+		String contentType = MimeUtils.getContentType(response.getContent().getHeaders());
+		logger.debug("Received content type: " + contentType);
+		OAuth2Identity unmarshalled;
+		// facebook sends back text/plain...
+		if ("text/plain".equals(contentType)) {
+			ReadableContainer<ByteBuffer> readable = ((ContentPart) response.getContent()).getReadable();
+			try {
+				byte [] content = IOUtils.toBytes(readable);
+				logger.debug("Received content: " + new String(content, "ASCII"));
+				Map<String, List<String>> returnedParameters = URIUtils.getQueryProperties(new URI("?" + new String(content, "ASCII")));
+				unmarshalled = new OAuth2Identity();
+				if (returnedParameters.get("access_token") == null || returnedParameters.get("access_token").isEmpty()) {
+					throw new HTTPException(500, "Could not find access_token in the returned content: " + new String(content));
+				}
+				unmarshalled.setAccessToken(returnedParameters.get("access_token").get(0));
+				if (returnedParameters.get("expires") != null && !returnedParameters.get("expires").isEmpty()) {
+					unmarshalled.setExpiresIn(Integer.parseInt(returnedParameters.get("expires").get(0)));
+				}
+			}
+			finally {
+				readable.close();
+			}
+		}
+		// normally it should be json though
+		else {
+			JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Identity.class));
+			binding.setIgnoreUnknownElements(true);
+			logger.debug("Unmarshalling token response");
+			if (logger.isTraceEnabled()) {
+				logger.trace("Token response: " + new String(IOUtils.toBytes(((ContentPart) response.getContent()).getReadable())));
+			}
+			ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
+			unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2Identity.class, BeanResolver.getInstance());
+		}
+		return unmarshalled;
+	}
+
+	public static HTTPRequest buildTokenRequest(OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType) throws IOException, UnsupportedEncodingException {
+		if (grantType == null) {
+			grantType = GrantType.AUTHORIZATION;
+		}
+		// by default we get a code in through a redirect and we send it along
+		// for a refresh we have an existing refresh token and we send that
+		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token") + URIUtils.encodeURIComponent(code) 
+			+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())
+			+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
+			+ "&redirect_uri=" + URIUtils.encodeURI(redirectURI.toString().replaceAll("\\?.*", ""))
+			+ "&grant_type=" + grantType.getGrantName();
+		// for microsoft
+		if (artifact.getConfiguration().getResource() != null) {
+			requestContent += "&resource=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getResource());
+		}
+		HTTPRequest request;
+		// facebook uses GET logic
+		if (TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
+			logger.debug("Creating GET request for token request");
+			request = new DefaultHTTPRequest("GET", artifact.getConfiguration().getTokenEndpoint().getPath() + "?" + requestContent, new PlainMimeEmptyPart(null,  
+				new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
+				new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
+				new MimeHeader("Content-Length", "0")
+			));
+		}
+		// google (et al?) uses POST logic
+		else {
+			byte[] bytes = requestContent.getBytes("ASCII");
+			logger.debug("Creating POST request for token request");
+			request = new DefaultHTTPRequest("POST", artifact.getConfiguration().getTokenEndpoint().getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
+				new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
+				new MimeHeader("Content-Type", "application/x-www-form-urlencoded"),
+				new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
+				new MimeHeader("Content-Length", Integer.valueOf(bytes.length).toString())
+			));
+		}
+		return request;
 	}
 
 }

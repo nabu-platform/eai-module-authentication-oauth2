@@ -115,3 +115,11 @@ This should also be a POST request that is form encoded.
 Note that the bearer header also seems supported.
 
 More information: https://developer-programs.linkedin.com/documents/profile-api
+
+# Microsoft
+
+## For business
+
+For business apps are documented [here](https://dev.onedrive.com/app-registration.htm#register-your-app-for-onedrive-for-business)
+
+Register app [here](https://apps.dev.microsoft.com/?referrer=https%3A%2F%2Fdev.onedrive.com%2Fapp-registration.htm) or once logged in [here](https://apps.dev.microsoft.com/#/appList).

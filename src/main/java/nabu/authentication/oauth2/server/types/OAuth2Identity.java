@@ -4,28 +4,39 @@ import javax.xml.bind.annotation.XmlElement;
 
 public class OAuth2Identity {
 	
-	private String accessToken, tokenType;
+	private String accessToken, refreshToken, tokenType;
 	private Integer expiresIn;
 	
 	@XmlElement(name = "access_token")
 	public String getAccessToken() {
 		return accessToken;
 	}
+	public void setAccessToken(String accessToken) {
+		this.accessToken = accessToken;
+	}
+
 	@XmlElement(name = "expires_in")
 	public Integer getExpiresIn() {
 		return expiresIn;
 	}
+	public void setExpiresIn(Integer expiresIn) {
+		this.expiresIn = expiresIn;
+	}
+
 	@XmlElement(name = "token_type")
 	public String getTokenType() {
 		return tokenType;
 	}
-	public void setAccessToken(String accessToken) {
-		this.accessToken = accessToken;
-	}
 	public void setTokenType(String tokenType) {
 		this.tokenType = tokenType;
 	}
-	public void setExpiresIn(Integer expiresIn) {
-		this.expiresIn = expiresIn;
+	
+	@XmlElement(name = "refresh_token")
+	public String getRefreshToken() {
+		return refreshToken;
 	}
+	public void setRefreshToken(String refreshToken) {
+		this.refreshToken = refreshToken;
+	}
+	
 }
