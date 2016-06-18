@@ -96,9 +96,11 @@ public class Services {
 		String redirectLink = getRedirectLink(oauth2, webApplication);
 		
 		String endpoint = loginEndpoint.toString()
-			+ "?client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId())
-			+ "&scope=" + URIUtils.encodeURIComponent(builder.toString())
-			+ "&redirect_uri=" + URIUtils.encodeURI(redirectLink)
+			+ "?client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId());
+		if (!builder.toString().trim().isEmpty()) {
+			endpoint += "&scope=" + URIUtils.encodeURIComponent(builder.toString());
+		}
+		endpoint += "&redirect_uri=" + URIUtils.encodeURI(redirectLink)
 			+ "&response_type=code";
 		
 		// This is currently only valid for google as far as I know
