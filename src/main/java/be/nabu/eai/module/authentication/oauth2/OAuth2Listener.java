@@ -125,7 +125,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					HTTPRequest request = buildTokenRequest(artifact, uri, code, GrantType.AUTHORIZATION);
+					HTTPRequest request = buildTokenRequest(artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest());
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, true, true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
@@ -249,26 +249,34 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		return unmarshalled;
 	}
 
-	public static HTTPRequest buildTokenRequest(OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType) throws IOException, UnsupportedEncodingException {
+	public static HTTPRequest buildTokenRequest(OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI) throws IOException, UnsupportedEncodingException {
 		if (grantType == null) {
 			grantType = GrantType.AUTHORIZATION;
+		}
+		if (includeRedirectURI == null) {
+			includeRedirectURI = true;
 		}
 		// by default we get a code in through a redirect and we send it along
 		// for a refresh we have an existing refresh token and we send that
 		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token") + URIUtils.encodeURIComponent(code) 
 			+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())
 			+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
-			+ "&redirect_uri=" + URIUtils.encodeURI(redirectURI.toString().replaceAll("\\?.*", ""))
 			+ "&grant_type=" + grantType.getGrantName();
+		
+		// for most providers, the redirect uri is required (e.g. google), but for example for digipolis it is not allowed, you will get exceptions if you send it along
+		if (includeRedirectURI) {
+			requestContent += "&redirect_uri=" + URIUtils.encodeURI(redirectURI.toString().replaceAll("\\?.*", ""));
+		}
 		// for microsoft
 		if (artifact.getConfiguration().getResource() != null) {
 			requestContent += "&resource=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getResource());
 		}
+		logger.debug("Token request content: {}", requestContent);
 		HTTPRequest request;
 		// facebook uses GET logic
 		if (TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
 			logger.debug("Creating GET request for token request");
-			request = new DefaultHTTPRequest("GET", artifact.getConfiguration().getTokenEndpoint().getPath() + "?" + requestContent, new PlainMimeEmptyPart(null,  
+			request = new DefaultHTTPRequest("GET", artifact.getConfiguration().getTokenEndpoint().getPath() + (artifact.getConfiguration().getTokenEndpoint().getPath().contains("?") ? "&" : "?") + requestContent, new PlainMimeEmptyPart(null,  
 				new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
 				new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
 				new MimeHeader("Content-Length", "0")

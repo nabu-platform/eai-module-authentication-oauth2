@@ -57,7 +57,7 @@ public class Services {
 		}
 		DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 		URI uri = new URI(URIUtils.encodeURI(getRedirectLink(artifact, webApplication)));
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(artifact, uri, refreshToken, GrantType.REFRESH);
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(artifact, uri, refreshToken, GrantType.REFRESH, artifact.getConfig().getRedirectUriInTokenRequest());
 		HTTPResponse response = newClient.execute(request, null, true, true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -66,7 +66,7 @@ public class Services {
 	}
 	
 	@WebResult(name = "link")
-	public String getRedirectLink(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @WebParam(name = "accessType") AccessType accessType) throws IOException {
+	public String getRedirectLink(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @WebParam(name = "accessType") AccessType accessType, @WebParam(name = "approvalPrompt") Boolean approvalPrompt) throws IOException {
 		OAuth2Artifact oauth2 = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (oauth2 == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
@@ -96,7 +96,7 @@ public class Services {
 		String redirectLink = getRedirectLink(oauth2, webApplication);
 		
 		String endpoint = loginEndpoint.toString()
-			+ "?client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId());
+			+ (loginEndpoint.getQuery() != null ? "&" : "?") + "client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId());
 		if (!builder.toString().trim().isEmpty()) {
 			endpoint += "&scope=" + URIUtils.encodeURIComponent(builder.toString());
 		}
@@ -107,7 +107,7 @@ public class Services {
 		if (accessType != null && AccessType.OFFLINE.equals(accessType)) {
 			endpoint += "&approval_prompt=force&access_type=offline";
 		}
-		else {
+		else if (approvalPrompt == null || approvalPrompt) {
 			// this prevents google from prompting every time
 			endpoint += "&approval_prompt=auto";
 		}
