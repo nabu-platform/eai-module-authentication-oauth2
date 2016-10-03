@@ -258,7 +258,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		// by default we get a code in through a redirect and we send it along
 		// for a refresh we have an existing refresh token and we send that
-		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token") + URIUtils.encodeURIComponent(code) 
+		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token=") + URIUtils.encodeURIComponent(code) 
 			+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())
 			+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
 			+ "&grant_type=" + grantType.getGrantName();
