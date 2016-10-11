@@ -67,6 +67,7 @@ public class OAuth2Configuration {
 		this.resource = resource;
 	}
 	
+	@EnvironmentSpecific
 	@NotNull
 	public URI getTokenEndpoint() {
 		return tokenEndpoint;
@@ -92,6 +93,7 @@ public class OAuth2Configuration {
 		this.httpClient = httpClient;
 	}
 	
+	@EnvironmentSpecific
 	@NotNull
 	public URI getLoginEndpoint() {
 		return loginEndpoint;
@@ -100,6 +102,7 @@ public class OAuth2Configuration {
 		this.loginEndpoint = loginEndpoint;
 	}
 	
+	@EnvironmentSpecific
 	@NotNull
 	public URI getApiEndpoint() {
 		return apiEndpoint;
@@ -116,7 +119,6 @@ public class OAuth2Configuration {
 		this.serverPath = serverPath;
 	}
 	
-	@NotNull
 	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
 	@InterfaceFilter(implement = "be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator.authenticate")
 	public DefinedService getAuthenticatorService() {

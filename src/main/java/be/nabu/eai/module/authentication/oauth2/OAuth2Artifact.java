@@ -1,6 +1,8 @@
 package be.nabu.eai.module.authentication.oauth2;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,14 +10,19 @@ import java.util.Map;
 import be.nabu.libs.http.api.HTTPRequest;
 import be.nabu.libs.http.api.HTTPResponse;
 import be.nabu.libs.http.server.HTTPServerUtils;
+import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
+import be.nabu.eai.module.web.application.WebFragmentConfiguration;
 import be.nabu.eai.module.web.application.WebFragmentPriority;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.libs.authentication.api.Permission;
 import be.nabu.libs.events.api.EventSubscription;
 import be.nabu.libs.resources.api.ResourceContainer;
+import be.nabu.libs.types.api.ComplexType;
+import be.nabu.libs.types.api.DefinedType;
+import be.nabu.libs.types.api.Element;
 
 public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements WebFragment {
 
@@ -79,6 +86,30 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 	@Override
 	public WebFragmentPriority getPriority() {
 		return WebFragmentPriority.HIGH;
+	}
+
+	@Override
+	public List<WebFragmentConfiguration> getFragmentConfiguration() {
+		List<WebFragmentConfiguration> configurations = new ArrayList<WebFragmentConfiguration>();
+		if (getConfig().getAuthenticatorService() != null) {
+			Method method = WebApplication.getMethod(OAuth2Authenticator.class, "authenticate");
+			List<Element<?>> inputExtensions = WebApplication.getInputExtensions(getConfig().getAuthenticatorService(), method);
+			for (final Element<?> extension : inputExtensions) {
+				if (extension.getType() instanceof ComplexType && extension.getType() instanceof DefinedType) {
+					configurations.add(new WebFragmentConfiguration() {
+						@Override
+						public ComplexType getType() {
+							return (ComplexType) extension.getType();
+						}
+						@Override
+						public String getPath() {
+							return getConfig().getServerPath() == null ? "/" : getConfig().getServerPath();
+						}
+					});
+				}
+			}
+		}
+		return configurations;
 	}
 	
 }

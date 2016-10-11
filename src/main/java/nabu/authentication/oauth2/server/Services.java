@@ -43,21 +43,13 @@ public class Services {
 	}
 	
 	@WebResult(name = "credentials")
-	public OAuth2Identity refreshToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @NotNull @WebParam(name = "refreshToken") String refreshToken) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
+	public OAuth2Identity refreshToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "refreshToken") String refreshToken) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
 		OAuth2Artifact artifact = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (artifact == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
-		WebApplication webApplication = executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
-		if (webApplication == null) {
-			throw new IllegalStateException("Can not find web application: " + webApplicationId);
-		}
-		else if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
-			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
-		}
 		DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-		URI uri = new URI(URIUtils.encodeURI(getRedirectLink(artifact, webApplication)));
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(artifact, uri, refreshToken, GrantType.REFRESH, artifact.getConfig().getRedirectUriInTokenRequest());
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(artifact, null, refreshToken, GrantType.REFRESH, false);
 		HTTPResponse response = newClient.execute(request, null, true, true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -105,7 +97,10 @@ public class Services {
 		
 		// This is currently only valid for google as far as I know
 		if (accessType != null && AccessType.OFFLINE.equals(accessType)) {
-			endpoint += "&approval_prompt=force&access_type=offline";
+			if (approvalPrompt == null || approvalPrompt) {
+				endpoint += "&approval_prompt=force";
+			}
+			endpoint += "&access_type=offline";
 		}
 		else if (approvalPrompt == null || approvalPrompt) {
 			// this prevents google from prompting every time
