@@ -168,7 +168,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						);
 						
 						// get the cookies, we want to see if there is a device id yet
-						Map<String, List<String>> cookies = HTTPUtils.getCookies(request.getContent().getHeaders());
+						Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
 						boolean isNewDevice = false;
 						List<String> cookieValues = cookies.get("Device-" + application.getRealm());
 						String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
@@ -177,10 +177,13 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							isNewDevice = true;
 						}
 						logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
+						System.out.println("HEADERS = " + java.util.Arrays.asList(event.getContent().getHeaders()));
+						System.out.println("\tUSER = " +GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()));
+						System.out.println("\tHOST = " +GlueHTTPUtils.getHost(event.getContent().getHeaders()));
 						token = proxy.authenticate(artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 							deviceId, 
-							request.getContent() == null ? null : GlueHTTPUtils.getUserAgent(request.getContent().getHeaders()), 
-							request.getContent() == null ? null : GlueHTTPUtils.getHost(request.getContent().getHeaders())
+							GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
+							GlueHTTPUtils.getHost(event.getContent().getHeaders())
 						));
 						if (token == null) {
 							throw new HTTPException(500, "Login failed");
