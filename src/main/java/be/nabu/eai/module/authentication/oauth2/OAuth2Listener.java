@@ -177,9 +177,6 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							isNewDevice = true;
 						}
 						logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-						System.out.println("HEADERS = " + java.util.Arrays.asList(event.getContent().getHeaders()));
-						System.out.println("\tUSER = " +GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()));
-						System.out.println("\tHOST = " +GlueHTTPUtils.getHost(event.getContent().getHeaders()));
 						token = proxy.authenticate(artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 							deviceId, 
 							GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
