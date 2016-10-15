@@ -180,7 +180,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						token = proxy.authenticate(artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 							deviceId, 
 							request.getContent() == null ? null : GlueHTTPUtils.getUserAgent(request.getContent().getHeaders()), 
-							request.getContent() == null ? null : GlueHTTPUtils.getIp(request.getContent().getHeaders())
+							request.getContent() == null ? null : GlueHTTPUtils.getHost(request.getContent().getHeaders())
 						));
 						if (token == null) {
 							throw new HTTPException(500, "Login failed");
