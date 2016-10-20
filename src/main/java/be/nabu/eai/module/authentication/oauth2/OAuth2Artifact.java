@@ -15,6 +15,7 @@ import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
 import be.nabu.eai.module.web.application.WebFragmentConfiguration;
 import be.nabu.eai.module.web.application.WebFragmentPriority;
+import be.nabu.eai.repository.EAIRepositoryUtils;
 import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.libs.authentication.api.Permission;
@@ -93,7 +94,7 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 		List<WebFragmentConfiguration> configurations = new ArrayList<WebFragmentConfiguration>();
 		if (getConfig().getAuthenticatorService() != null) {
 			Method method = WebApplication.getMethod(OAuth2Authenticator.class, "authenticate");
-			List<Element<?>> inputExtensions = WebApplication.getInputExtensions(getConfig().getAuthenticatorService(), method);
+			List<Element<?>> inputExtensions = EAIRepositoryUtils.getInputExtensions(getConfig().getAuthenticatorService(), method);
 			for (final Element<?> extension : inputExtensions) {
 				if (extension.getType() instanceof ComplexType && extension.getType() instanceof DefinedType) {
 					configurations.add(new WebFragmentConfiguration() {
