@@ -28,6 +28,7 @@ import be.nabu.libs.http.client.DefaultHTTPClient;
 import be.nabu.libs.resources.URIUtils;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ExecutionContext;
+import be.nabu.libs.types.api.ComplexContent;
 import be.nabu.utils.mime.impl.FormatException;
 
 @WebService
@@ -43,13 +44,17 @@ public class Services {
 	}
 	
 	@WebResult(name = "credentials")
-	public OAuth2Identity refreshToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "refreshToken") String refreshToken) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
+	public OAuth2Identity refreshToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @NotNull @WebParam(name = "refreshToken") String refreshToken) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
 		OAuth2Artifact artifact = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (artifact == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
+		WebApplication webApplication = executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
+		if (webApplication == null) {
+			throw new IllegalStateException("Can not find web application: " + webApplicationId);
+		}
 		DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(artifact, null, refreshToken, GrantType.REFRESH, false);
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false);
 		HTTPResponse response = newClient.execute(request, null, true, true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -87,8 +92,16 @@ public class Services {
 
 		String redirectLink = getRedirectLink(oauth2, webApplication);
 		
+		String clientId = oauth2.getConfiguration().getClientId();
+		if (clientId == null) {
+			ComplexContent configuration = webApplication.getConfigurationFor(oauth2.getConfig().getServerPath() == null ? "/" : oauth2.getConfig().getServerPath(), oauth2.getConfigurationType());
+			clientId = (String) configuration.get("clientId");
+		}
+		if (clientId == null) {
+			throw new IllegalStateException("Can not find client id");
+		}
 		String endpoint = loginEndpoint.toString()
-			+ (loginEndpoint.getQuery() != null ? "&" : "?") + "client_id=" + URIUtils.encodeURIComponent(oauth2.getConfiguration().getClientId());
+			+ (loginEndpoint.getQuery() != null ? "&" : "?") + "client_id=" + URIUtils.encodeURIComponent(clientId);
 		if (!builder.toString().trim().isEmpty()) {
 			endpoint += "&scope=" + URIUtils.encodeURIComponent(builder.toString());
 		}

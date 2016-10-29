@@ -143,7 +143,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					HTTPRequest request = buildTokenRequest(artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest());
+					HTTPRequest request = buildTokenRequest(application, artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest());
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, true, true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
@@ -177,7 +177,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							isNewDevice = true;
 						}
 						logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-						token = proxy.authenticate(artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
+						token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 							deviceId, 
 							GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
 							GlueHTTPUtils.getHost(event.getContent().getHeaders())
@@ -298,18 +298,33 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		return unmarshalled;
 	}
 
-	public static HTTPRequest buildTokenRequest(OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI) throws IOException, UnsupportedEncodingException {
+	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI) throws IOException, UnsupportedEncodingException {
 		if (grantType == null) {
 			grantType = GrantType.AUTHORIZATION;
 		}
 		if (includeRedirectURI == null) {
 			includeRedirectURI = true;
 		}
+		String clientId = artifact.getConfig().getClientId();
+		String clientSecret = artifact.getConfig().getClientSecret();
+		if (clientId == null && webApplication != null) {
+			try {
+				ComplexContent clientConfiguration = webApplication.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+				clientId = (String) clientConfiguration.get("clientId");
+				clientSecret = (String) clientConfiguration.get("clientSecret");
+			}
+			catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		if (clientId == null) {
+			throw new IllegalArgumentException("Could not find client id");
+		}
 		// by default we get a code in through a redirect and we send it along
 		// for a refresh we have an existing refresh token and we send that
 		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token=") + URIUtils.encodeURIComponent(code) 
-			+ "&client_id=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientId())
-			+ "&client_secret=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getClientSecret())
+			+ "&client_id=" + URIUtils.encodeURIComponent(clientId)
+			+ "&client_secret=" + URIUtils.encodeURIComponent(clientSecret)
 			+ "&grant_type=" + grantType.getGrantName();
 		
 		// for most providers, the redirect uri is required (e.g. google), but for example for digipolis it is not allowed, you will get exceptions if you send it along

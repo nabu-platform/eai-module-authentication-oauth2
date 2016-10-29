@@ -7,9 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import be.nabu.libs.http.api.HTTPRequest;
-import be.nabu.libs.http.api.HTTPResponse;
-import be.nabu.libs.http.server.HTTPServerUtils;
 import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebFragment;
@@ -20,14 +17,21 @@ import be.nabu.eai.repository.api.Repository;
 import be.nabu.eai.repository.artifacts.jaxb.JAXBArtifact;
 import be.nabu.libs.authentication.api.Permission;
 import be.nabu.libs.events.api.EventSubscription;
+import be.nabu.libs.http.api.HTTPRequest;
+import be.nabu.libs.http.api.HTTPResponse;
+import be.nabu.libs.http.server.HTTPServerUtils;
 import be.nabu.libs.resources.api.ResourceContainer;
+import be.nabu.libs.types.SimpleTypeWrapperFactory;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.api.DefinedType;
 import be.nabu.libs.types.api.Element;
+import be.nabu.libs.types.base.SimpleElementImpl;
+import be.nabu.libs.types.structure.DefinedStructure;
 
 public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements WebFragment {
 
 	private Map<String, EventSubscription<?, ?>> subscriptions = new HashMap<String, EventSubscription<?, ?>>();
+	private DefinedStructure configuration;
 	
 	private String getKey(WebApplication artifact, String path) {
 		return artifact.getId() + ":" + path;
@@ -110,7 +114,30 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 				}
 			}
 		}
+		// if client id is not filled in, generate a configuration for this oauth2 artifact
+		if (getConfig().getClientId() == null) {
+			configurations.add(new WebFragmentConfiguration() {
+				@Override
+				public ComplexType getType() {
+					return getConfigurationType();
+				}
+				@Override
+				public String getPath() {
+					return getConfig().getServerPath() == null ? "/" : getConfig().getServerPath();
+				}
+			});
+		}
 		return configurations;
 	}
-	
+
+	public DefinedStructure getConfigurationType() {
+		if (configuration == null) {
+			configuration = new DefinedStructure();
+			configuration.setName("oauth2Configuration");
+			configuration.setId(getId() + ".oauth2Configuration");
+			configuration.add(new SimpleElementImpl<String>("clientId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration));
+			configuration.add(new SimpleElementImpl<String>("clientSecret", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration));
+		}
+		return configuration;
+	}
 }
