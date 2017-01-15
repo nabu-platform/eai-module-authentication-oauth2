@@ -2,6 +2,7 @@ package be.nabu.eai.module.authentication.oauth2;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -137,6 +138,9 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 			configuration.setId(getId() + ".oauth2Configuration");
 			configuration.add(new SimpleElementImpl<String>("clientId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration));
 			configuration.add(new SimpleElementImpl<String>("clientSecret", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration));
+			configuration.add(new SimpleElementImpl<URI>("loginEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+			configuration.add(new SimpleElementImpl<URI>("tokenEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+			configuration.add(new SimpleElementImpl<URI>("apiEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
 		}
 		return configuration;
 	}

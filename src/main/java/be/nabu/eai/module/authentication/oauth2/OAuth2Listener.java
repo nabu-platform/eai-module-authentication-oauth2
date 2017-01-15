@@ -143,7 +143,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					HTTPRequest request = buildTokenRequest(application, artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest());
+					HTTPRequest request = buildTokenRequest(application, artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null);
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, true, true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
@@ -176,12 +176,17 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							deviceId = UUID.randomUUID().toString().replace("-", "");
 							isNewDevice = true;
 						}
+						ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+						URI apiEndpoint = artifact.getConfig().getApiEndpoint();
+						if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
+							apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
+						}
 						logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
 						token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 							deviceId, 
 							GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
 							GlueHTTPUtils.getHost(event.getContent().getHeaders())
-						));
+						), apiEndpoint);
 						if (token == null) {
 							throw new HTTPException(500, "Login failed");
 						}
@@ -298,7 +303,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		return unmarshalled;
 	}
 
-	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI) throws IOException, UnsupportedEncodingException {
+	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI, String resource) throws IOException, UnsupportedEncodingException {
 		if (grantType == null) {
 			grantType = GrantType.AUTHORIZATION;
 		}
@@ -307,15 +312,12 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		String clientId = artifact.getConfig().getClientId();
 		String clientSecret = artifact.getConfig().getClientSecret();
-		if (clientId == null && webApplication != null) {
-			try {
-				ComplexContent clientConfiguration = webApplication.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
-				clientId = (String) clientConfiguration.get("clientId");
-				clientSecret = (String) clientConfiguration.get("clientSecret");
-			}
-			catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+		ComplexContent clientConfiguration = webApplication == null ? null : webApplication.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+		if (clientConfiguration != null && clientConfiguration.get("clientId") != null) {
+			clientId = (String) clientConfiguration.get("clientId");
+		}
+		if (clientConfiguration != null && clientConfiguration.get("clientSecret") != null) {
+			clientSecret = (String) clientConfiguration.get("clientSecret");
 		}
 		if (clientId == null) {
 			throw new IllegalArgumentException("Could not find client id");
@@ -331,17 +333,24 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		if (includeRedirectURI) {
 			requestContent += "&redirect_uri=" + URIUtils.encodeURI(redirectURI.toString().replaceAll("\\?.*", ""));
 		}
+		if (resource == null) {
+			resource = artifact.getConfiguration().getResource();
+		}
 		// for microsoft
-		if (artifact.getConfiguration().getResource() != null) {
-			requestContent += "&resource=" + URIUtils.encodeURIComponent(artifact.getConfiguration().getResource());
+		if (resource != null) {
+			requestContent += "&resource=" + URIUtils.encodeURIComponent(resource);
 		}
 		logger.debug("Token request content: {}", requestContent);
 		HTTPRequest request;
 		// facebook uses GET logic
+		URI tokenEndpoint = artifact.getConfiguration().getTokenEndpoint();
+		if (clientConfiguration != null && clientConfiguration.get("tokenEndpoint") != null) {
+			tokenEndpoint = (URI) clientConfiguration.get("tokenEndpoint");
+		}
 		if (TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
 			logger.debug("Creating GET request for token request");
-			request = new DefaultHTTPRequest("GET", artifact.getConfiguration().getTokenEndpoint().getPath() + (artifact.getConfiguration().getTokenEndpoint().getPath().contains("?") ? "&" : "?") + requestContent, new PlainMimeEmptyPart(null,  
-				new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
+			request = new DefaultHTTPRequest("GET", tokenEndpoint.getPath() + (tokenEndpoint.getPath().contains("?") ? "&" : "?") + requestContent, new PlainMimeEmptyPart(null,  
+				new MimeHeader("Host", tokenEndpoint.getAuthority()),
 				new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
 				new MimeHeader("Content-Length", "0")
 			));
@@ -350,8 +359,8 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		else {
 			byte[] bytes = requestContent.getBytes("ASCII");
 			logger.debug("Creating POST request for token request");
-			request = new DefaultHTTPRequest("POST", artifact.getConfiguration().getTokenEndpoint().getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
-				new MimeHeader("Host", artifact.getConfiguration().getTokenEndpoint().getAuthority()),
+			request = new DefaultHTTPRequest("POST", tokenEndpoint.getPath(), new PlainMimeContentPart(null, IOUtils.wrap(bytes, true), 
+				new MimeHeader("Host", tokenEndpoint.getAuthority()),
 				new MimeHeader("Content-Type", "application/x-www-form-urlencoded"),
 				new MimeHeader("Accept", "application/json,application/javascript,application/x-javascript"),
 				new MimeHeader("Content-Length", Integer.valueOf(bytes.length).toString())

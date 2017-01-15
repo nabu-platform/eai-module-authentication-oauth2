@@ -43,8 +43,13 @@ public class Services {
 		return new OAuth2Token(identity, realm);
 	}
 	
+	/**
+	 * For microsoft you can do this:
+	 * - get token for the discovery resource, allowing you to discover API's
+	 * - use refresh token of discovery resource to get a new token for target API using the newly discovered resource
+	 */
 	@WebResult(name = "credentials")
-	public OAuth2Identity refreshToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @NotNull @WebParam(name = "refreshToken") String refreshToken) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
+	public OAuth2Identity refreshToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @NotNull @WebParam(name = "refreshToken") String refreshToken, @WebParam(name = "resource") String resource) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
 		OAuth2Artifact artifact = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (artifact == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
@@ -54,7 +59,7 @@ public class Services {
 			throw new IllegalStateException("Can not find web application: " + webApplicationId);
 		}
 		DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false);
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false, resource);
 		HTTPResponse response = newClient.execute(request, null, true, true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -76,6 +81,7 @@ public class Services {
 			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
 		}
 
+		ComplexContent configuration = webApplication.getConfigurationFor(oauth2.getConfig().getServerPath() == null ? "/" : oauth2.getConfig().getServerPath(), oauth2.getConfigurationType());
 		StringBuilder builder = new StringBuilder();
 		if (oauth2.getConfiguration().getScopes() != null) {
 			for (String scope : oauth2.getConfiguration().getScopes()) {
@@ -86,6 +92,9 @@ public class Services {
 			}
 		}
 		URI loginEndpoint = oauth2.getConfiguration().getLoginEndpoint();
+		if (configuration != null && configuration.get("loginEndpoint") != null) {
+			loginEndpoint = (URI) configuration.get("loginEndpoint");
+		}
 		if (loginEndpoint == null) {
 			return null;
 		}
@@ -93,8 +102,7 @@ public class Services {
 		String redirectLink = getRedirectLink(oauth2, webApplication);
 		
 		String clientId = oauth2.getConfiguration().getClientId();
-		if (clientId == null) {
-			ComplexContent configuration = webApplication.getConfigurationFor(oauth2.getConfig().getServerPath() == null ? "/" : oauth2.getConfig().getServerPath(), oauth2.getConfigurationType());
+		if (configuration != null && configuration.get("clientId") != null) {
 			clientId = (String) configuration.get("clientId");
 		}
 		if (clientId == null) {
