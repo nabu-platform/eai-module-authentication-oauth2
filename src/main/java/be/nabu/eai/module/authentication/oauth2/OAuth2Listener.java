@@ -151,6 +151,10 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 					}
 					OAuth2Identity unmarshalled = getIdentityFromResponse(response);
+					if (unmarshalled instanceof OAuth2IdentityWithContext) {
+						((OAuth2IdentityWithContext) unmarshalled).setOauth2Provider(artifact.getId());
+						((OAuth2IdentityWithContext) unmarshalled).setWebApplication(application.getId());
+					}
 					logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
 					Token token = null;
 					List<Header> responseHeaders = new ArrayList<Header>();
@@ -276,7 +280,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				byte [] content = IOUtils.toBytes(readable);
 				logger.debug("Received content: " + new String(content, "ASCII"));
 				Map<String, List<String>> returnedParameters = URIUtils.getQueryProperties(new URI("?" + new String(content, "ASCII")));
-				unmarshalled = new OAuth2Identity();
+				unmarshalled = new OAuth2IdentityWithContext();
 				if (returnedParameters.get("access_token") == null || returnedParameters.get("access_token").isEmpty()) {
 					throw new HTTPException(500, "Could not find access_token in the returned content: " + new String(content));
 				}
@@ -291,14 +295,14 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		// normally it should be json though
 		else {
-			JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2Identity.class));
+			JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2IdentityWithContext.class));
 			binding.setIgnoreUnknownElements(true);
 			logger.debug("Unmarshalling token response");
 			if (logger.isTraceEnabled()) {
 				logger.trace("Token response: " + new String(IOUtils.toBytes(((ContentPart) response.getContent()).getReadable())));
 			}
 			ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
-			unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2Identity.class, BeanResolver.getInstance());
+			unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2IdentityWithContext.class, BeanResolver.getInstance());
 		}
 		return unmarshalled;
 	}

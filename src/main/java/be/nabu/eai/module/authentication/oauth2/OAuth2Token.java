@@ -15,6 +15,10 @@ public class OAuth2Token implements Token {
 	private String realm;
 	private Date validUntil;
 
+	public OAuth2Token() {
+		// auto construct
+	}
+	
 	public OAuth2Token(OAuth2Identity token, String realm) {
 		this.token = token;
 		this.realm = realm;
@@ -45,4 +49,5 @@ public class OAuth2Token implements Token {
 	public OAuth2Identity getOAuth2Token() {
 		return token;
 	}
+	
 }

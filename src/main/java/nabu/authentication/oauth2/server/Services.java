@@ -5,7 +5,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
 import java.text.ParseException;
+import java.util.Date;
 import java.util.UUID;
 
 import javax.jws.WebParam;
@@ -15,6 +17,7 @@ import javax.validation.constraints.NotNull;
 
 import nabu.authentication.oauth2.server.types.OAuth2Identity;
 import be.nabu.eai.module.authentication.oauth2.OAuth2Artifact;
+import be.nabu.eai.module.authentication.oauth2.OAuth2IdentityWithContext;
 import be.nabu.eai.module.authentication.oauth2.OAuth2Listener;
 import be.nabu.eai.module.authentication.oauth2.OAuth2Token;
 import be.nabu.eai.module.http.server.HTTPServerArtifact;
@@ -41,6 +44,47 @@ public class Services {
 	@WebResult(name = "token")
 	public Token toToken(@NotNull @WebParam(name = "credentials") OAuth2Identity identity, @WebParam(name = "realm") String realm) {
 		return new OAuth2Token(identity, realm);
+	}
+
+	@WebResult(name = "credentials")
+	public OAuth2Identity getCurrentCredentials() throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
+		Token token = executionContext.getSecurityContext().getToken();
+		if (token != null) {
+			OAuth2Identity identity = null;
+			if (token instanceof OAuth2Token) {
+				identity = ((OAuth2Token) token).getOAuth2Token();
+			}
+			else if (token.getCredentials() != null) {
+				for (Principal principal : token.getCredentials()) {
+					if (principal instanceof OAuth2Token) {
+						identity = ((OAuth2Token) principal).getOAuth2Token();
+					}
+				}
+			}
+			if (identity != null) {
+				// if we have some context and a refresh token, update it if necessary
+				if (identity instanceof OAuth2IdentityWithContext && identity.getRefreshToken() != null) {
+					// if it expires within 5 minutes and has a refresh, trigger automatically
+					if (((OAuth2IdentityWithContext) identity).getExpired().getTime() - new Date().getTime() < 300000) {
+						OAuth2Identity refreshed = refreshToken(
+							((OAuth2IdentityWithContext) identity).getOauth2Provider(),
+							((OAuth2IdentityWithContext) identity).getWebApplication(),
+							identity.getRefreshToken(),
+							null
+						);
+						if (refreshed != null) {
+							identity.setAccessToken(refreshed.getAccessToken());
+							identity.setExpiresIn(refreshed.getExpiresIn());
+							identity.setRefreshToken(refreshed.getRefreshToken());
+							identity.setTokenType(refreshed.getTokenType());
+							((OAuth2IdentityWithContext) identity).recreate();
+						}
+					}
+				}
+				return identity;
+			}
+		}
+		return null;
 	}
 	
 	/**
