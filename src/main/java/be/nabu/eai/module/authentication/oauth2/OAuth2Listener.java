@@ -114,7 +114,9 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					throw new HTTPException(500, "The login failed: " + queryProperties.get("error") + " - " + queryProperties.get("error_description"));
 				}
 				return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
-					new PlainMimeEmptyPart(null, new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath())))
+					new PlainMimeEmptyPart(null, 
+						new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath())),
+						new MimeHeader("Content-Length", "0"))
 				);
 			}
 			else {
