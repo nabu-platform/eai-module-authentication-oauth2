@@ -8,14 +8,16 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
+import be.nabu.eai.api.Advanced;
 import be.nabu.eai.api.EnvironmentSpecific;
 import be.nabu.eai.api.InterfaceFilter;
 import be.nabu.eai.module.http.client.HTTPClientArtifact;
+import be.nabu.eai.module.keystore.KeyStoreArtifact;
 import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -42,6 +44,9 @@ public class OAuth2Configuration {
 	private TokenResolverType tokenResolvingType;
 	private Boolean redirectUriInTokenRequest = true;
 
+	private String jwtKeyAlias;
+	private KeyStoreArtifact jwtKeyStore;
+	
 	@EnvironmentSpecific
 	@NotNull
 	public String getClientId() {
@@ -164,5 +169,22 @@ public class OAuth2Configuration {
 		this.redirectUriInTokenRequest = redirectUriInTokenRequest;
 	}
 
+	@Advanced
+	@EnvironmentSpecific
+	public String getJwtKeyAlias() {
+		return jwtKeyAlias;
+	}
+	public void setJwtKeyAlias(String jwtKeyAlias) {
+		this.jwtKeyAlias = jwtKeyAlias;
+	}
 	
+	@Advanced
+	@EnvironmentSpecific
+	@XmlJavaTypeAdapter(value = ArtifactXMLAdapter.class)
+	public KeyStoreArtifact getJwtKeyStore() {
+		return jwtKeyStore;
+	}
+	public void setJwtKeyStore(KeyStoreArtifact jwtKeyStore) {
+		this.jwtKeyStore = jwtKeyStore;
+	}
 }

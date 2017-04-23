@@ -1,7 +1,9 @@
 package nabu.authentication.oauth2.server.types;
 
 import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
 
+@XmlRootElement
 public class OAuth2Identity {
 	
 	private String accessToken, refreshToken, tokenType;

@@ -5,6 +5,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.Key;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -21,7 +22,9 @@ import org.slf4j.LoggerFactory;
 
 import be.nabu.eai.module.authentication.oauth2.OAuth2Configuration.TokenResolverType;
 import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
+import be.nabu.eai.module.keystore.KeyStoreArtifact;
 import be.nabu.eai.module.web.application.WebApplication;
+import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.authentication.api.TokenWithSecret;
@@ -38,6 +41,9 @@ import be.nabu.libs.http.core.DefaultHTTPResponse;
 import be.nabu.libs.http.core.HTTPUtils;
 import be.nabu.libs.http.glue.GlueListener;
 import be.nabu.libs.http.glue.impl.GlueHTTPUtils;
+import be.nabu.libs.http.jwt.JWTBody;
+import be.nabu.libs.http.jwt.JWTToken;
+import be.nabu.libs.http.jwt.JWTUtils;
 import be.nabu.libs.resources.URIUtils;
 import be.nabu.libs.services.api.Service;
 import be.nabu.libs.services.pojo.POJOUtils;
@@ -152,11 +158,9 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					if (response.getCode() != 200) {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 					}
-					OAuth2Identity unmarshalled = getIdentityFromResponse(response);
-					if (unmarshalled instanceof OAuth2IdentityWithContext) {
-						((OAuth2IdentityWithContext) unmarshalled).setOauth2Provider(artifact.getId());
-						((OAuth2IdentityWithContext) unmarshalled).setWebApplication(application.getId());
-					}
+					OAuth2IdentityWithContext unmarshalled = getIdentityFromResponse(response);
+					unmarshalled.setOauth2Provider(artifact.getId());
+					unmarshalled.setWebApplication(application.getId());
 					logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
 					Token token = null;
 					List<Header> responseHeaders = new ArrayList<Header>();
@@ -164,6 +168,10 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					// if we don't want to map it to an internal representation of the user, send it back as is
 					if (authenticatorService == null) {
 						token = new OAuth2Token(unmarshalled, application.getRealm());
+						JWTToken jwtToken = getJWTToken(artifact, application.getRealm(), unmarshalled);
+						if (jwtToken != null) {
+							token.getCredentials().add(jwtToken);
+						}
 					}
 					else {
 						OAuth2Authenticator proxy = POJOUtils.newProxy(
@@ -271,10 +279,10 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 	}
 
-	public static OAuth2Identity getIdentityFromResponse(HTTPResponse response) throws IOException, UnsupportedEncodingException, URISyntaxException, ParseException {
+	public static OAuth2IdentityWithContext getIdentityFromResponse(HTTPResponse response) throws IOException, UnsupportedEncodingException, URISyntaxException, ParseException {
 		String contentType = MimeUtils.getContentType(response.getContent().getHeaders());
 		logger.debug("Received content type: " + contentType);
-		OAuth2Identity unmarshalled;
+		OAuth2IdentityWithContext unmarshalled;
 		// facebook sends back text/plain...
 		if ("text/plain".equals(contentType)) {
 			ReadableContainer<ByteBuffer> readable = ((ContentPart) response.getContent()).getReadable();
@@ -374,5 +382,39 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		return request;
 	}
+	
+	public static JWTToken getJWTToken(OAuth2IdentityWithContext identity) throws ParseException {
+		OAuth2Artifact artifact = (OAuth2Artifact) EAIResourceRepository.getInstance().resolve(identity.getOauth2Provider());
+		if (artifact == null) {
+			throw new IllegalArgumentException("Can not find oauth2 artifact: " + identity.getOauth2Provider());
+		}
+		WebApplication webApplication = (WebApplication) EAIResourceRepository.getInstance().resolve(identity.getWebApplication());
+		if (webApplication == null) {
+			throw new IllegalStateException("Can not find web application: " + identity.getWebApplication());
+		}
+		return getJWTToken(artifact, webApplication.getRealm(), identity);
+	}
 
+	public static JWTToken getJWTToken(OAuth2Artifact artifact, String realm, OAuth2Identity identity) throws ParseException {
+		if (artifact.getConfig().getJwtKeyStore() != null && artifact.getConfig().getJwtKeyAlias() != null) {
+			KeyStoreArtifact keystore = artifact.getConfig().getJwtKeyStore();
+			Key key = null;
+			try {
+				key = keystore.getKeyStore().getCertificate(artifact.getConfig().getJwtKeyAlias()).getPublicKey();
+			}
+			catch (Exception e) {
+				try {
+					key = keystore.getKeyStore().getChain(artifact.getConfig().getJwtKeyAlias())[0].getPublicKey();
+				}
+				catch (Exception f) {
+					logger.info("JWT key alias '" + artifact.getConfig().getJwtKeyAlias() + " does not have a certificate, skipping JWT tokenization for oauth2");
+				}
+			}
+			if (key != null) {
+				JWTBody decode = JWTUtils.decode(key, identity.getAccessToken());
+				return new JWTToken(decode, realm);
+			}
+		}
+		return null;
+	}
 }

@@ -41,6 +41,13 @@ public class Services {
 	private ExecutionContext executionContext;
 	private ServiceRuntime runtime;
 
+	public Services() {
+		// auto
+	}
+	public Services(ExecutionContext context) {
+		this.executionContext = context;
+	}
+	
 	@WebResult(name = "token")
 	public Token toToken(@NotNull @WebParam(name = "credentials") OAuth2Identity identity, @WebParam(name = "realm") String realm) {
 		return new OAuth2Token(identity, realm);
