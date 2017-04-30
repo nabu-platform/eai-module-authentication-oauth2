@@ -67,7 +67,7 @@ public class OAuth2Token implements RefreshableToken {
 
 	@Override
 	public List<Principal> getCredentials() {
-		return null;
+		return credentials;
 	}
 
 	public OAuth2Identity getOAuth2Token() {
