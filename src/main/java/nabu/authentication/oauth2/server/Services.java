@@ -111,7 +111,7 @@ public class Services {
 		}
 		DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false, resource);
-		HTTPResponse response = newClient.execute(request, null, true, true);
+		HTTPResponse response = newClient.execute(request, null, OAuth2Listener.isSecureTokenEndpoint(webApplication, artifact), true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 		}

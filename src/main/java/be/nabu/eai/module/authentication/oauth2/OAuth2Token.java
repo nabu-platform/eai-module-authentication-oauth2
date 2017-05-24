@@ -6,6 +6,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import nabu.authentication.oauth2.server.Services;
 import nabu.authentication.oauth2.server.types.OAuth2Identity;
 import be.nabu.eai.repository.EAIResourceRepository;
@@ -22,6 +25,7 @@ public class OAuth2Token implements RefreshableToken {
 	private Date validUntil;
 	private String name = null;
 	private List<Principal> credentials = new ArrayList<Principal>();
+	private Logger logger = LoggerFactory.getLogger(getClass());
 	
 	public OAuth2Token() {
 		// auto construct
@@ -85,7 +89,6 @@ public class OAuth2Token implements RefreshableToken {
 					token.getRefreshToken(), 
 					null);
 
-				
 				JWTToken jwtToken = null;
 				if (identity instanceof OAuth2IdentityWithContext) {
 					((OAuth2IdentityWithContext) identity).setOauth2Provider(((OAuth2IdentityWithContext) token).getOauth2Provider());
@@ -106,7 +109,7 @@ public class OAuth2Token implements RefreshableToken {
 				return oAuth2Token;
 			}
 			catch (Exception e) {
-				throw new RuntimeException(e);
+				logger.debug("Could not refresh oauth2 token", e);
 			}
 		}
 		return null;

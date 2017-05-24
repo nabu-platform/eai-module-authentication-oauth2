@@ -153,7 +153,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				try {
 					HTTPRequest request = buildTokenRequest(application, artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null);
 					logger.debug("Requesting token based on code: " + code);
-					HTTPResponse response = newClient.execute(request, null, true, true);
+					HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
 					if (response.getCode() != 200) {
 						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -316,6 +316,15 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		return unmarshalled;
 	}
+	
+	public static boolean isSecureTokenEndpoint(WebApplication webApplication, OAuth2Artifact artifact) throws IOException {
+		ComplexContent clientConfiguration = webApplication == null ? null : webApplication.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+		URI tokenEndpoint = artifact.getConfiguration().getTokenEndpoint();
+		if (clientConfiguration != null && clientConfiguration.get("tokenEndpoint") != null) {
+			tokenEndpoint = (URI) clientConfiguration.get("tokenEndpoint");
+		}
+		return tokenEndpoint.getScheme().equals("https");
+	}
 
 	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI, String resource) throws IOException, UnsupportedEncodingException {
 		if (grantType == null) {
@@ -336,11 +345,12 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		if (clientId == null) {
 			throw new IllegalArgumentException("Could not find client id");
 		}
+		
 		// by default we get a code in through a redirect and we send it along
 		// for a refresh we have an existing refresh token and we send that
-		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token=") + URIUtils.encodeURIComponent(code) 
-			+ "&client_id=" + URIUtils.encodeURIComponent(clientId)
-			+ "&client_secret=" + URIUtils.encodeURIComponent(clientSecret)
+		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token=") + URIUtils.encodeURIComponent(code, false) 
+			+ "&client_id=" + URIUtils.encodeURIComponent(clientId, false)
+			+ "&client_secret=" + URIUtils.encodeURIComponent(clientSecret, false)
 			+ "&grant_type=" + grantType.getGrantName();
 		
 		// for most providers, the redirect uri is required (e.g. google), but for example for digipolis it is not allowed, you will get exceptions if you send it along
