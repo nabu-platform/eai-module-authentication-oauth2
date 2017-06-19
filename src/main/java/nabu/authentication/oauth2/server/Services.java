@@ -26,8 +26,8 @@ import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.http.HTTPException;
 import be.nabu.libs.http.api.HTTPRequest;
 import be.nabu.libs.http.api.HTTPResponse;
+import be.nabu.libs.http.api.client.HTTPClient;
 import be.nabu.libs.http.api.server.Session;
-import be.nabu.libs.http.client.DefaultHTTPClient;
 import be.nabu.libs.resources.URIUtils;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ExecutionContext;
@@ -54,8 +54,10 @@ public class Services {
 	}
 
 	@WebResult(name = "credentials")
-	public OAuth2Identity getCurrentCredentials() throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
-		Token token = executionContext.getSecurityContext().getToken();
+	public OAuth2Identity getCurrentCredentials(@WebParam(name = "token") Token token) throws KeyStoreException, NoSuchAlgorithmException, IOException, URISyntaxException, FormatException, ParseException {
+		if (token == null) {
+			token = executionContext.getSecurityContext().getToken();
+		}
 		if (token != null) {
 			OAuth2Identity identity = null;
 			if (token instanceof OAuth2Token) {
@@ -109,7 +111,7 @@ public class Services {
 		if (webApplication == null) {
 			throw new IllegalStateException("Can not find web application: " + webApplicationId);
 		}
-		DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
+		HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false, resource);
 		HTTPResponse response = newClient.execute(request, null, OAuth2Listener.isSecureTokenEndpoint(webApplication, artifact), true);
 		if (response.getCode() != 200) {

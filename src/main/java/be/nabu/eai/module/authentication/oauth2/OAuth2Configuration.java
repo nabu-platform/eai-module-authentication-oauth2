@@ -17,7 +17,7 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -46,6 +46,7 @@ public class OAuth2Configuration {
 
 	private String jwtKeyAlias;
 	private KeyStoreArtifact jwtKeyStore;
+	private boolean jwtUseOriginalRealm;
 	
 	@EnvironmentSpecific
 	@NotNull
@@ -187,4 +188,13 @@ public class OAuth2Configuration {
 	public void setJwtKeyStore(KeyStoreArtifact jwtKeyStore) {
 		this.jwtKeyStore = jwtKeyStore;
 	}
+	
+	@Advanced
+	public boolean isJwtUseOriginalRealm() {
+		return jwtUseOriginalRealm;
+	}
+	public void setJwtUseOriginalRealm(boolean jwtUseOriginalRealm) {
+		this.jwtUseOriginalRealm = jwtUseOriginalRealm;
+	}
+	
 }

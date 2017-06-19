@@ -34,8 +34,8 @@ import be.nabu.libs.http.HTTPCodes;
 import be.nabu.libs.http.HTTPException;
 import be.nabu.libs.http.api.HTTPRequest;
 import be.nabu.libs.http.api.HTTPResponse;
+import be.nabu.libs.http.api.client.HTTPClient;
 import be.nabu.libs.http.api.server.Session;
-import be.nabu.libs.http.client.DefaultHTTPClient;
 import be.nabu.libs.http.core.DefaultHTTPRequest;
 import be.nabu.libs.http.core.DefaultHTTPResponse;
 import be.nabu.libs.http.core.HTTPUtils;
@@ -149,7 +149,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				}
 				logger.debug("OAuth2 login successful, code retrieved");
 				String code = queryProperties.get("code").get(0);
-				DefaultHTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
+				HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
 					HTTPRequest request = buildTokenRequest(application, artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null);
 					logger.debug("Requesting token based on code: " + code);
@@ -261,7 +261,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					);
 				}
 				finally {
-					newClient.getConnectionHandler().close();
+					newClient.close();
 				}
 			}
 		}
@@ -422,7 +422,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			}
 			if (key != null) {
 				JWTBody decode = JWTUtils.decode(key, identity.getAccessToken());
-				return new JWTToken(decode, realm);
+				return artifact.getConfig().isJwtUseOriginalRealm() ? new JWTToken(decode) : new JWTToken(decode, realm);
 			}
 		}
 		return null;
