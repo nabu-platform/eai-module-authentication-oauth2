@@ -22,6 +22,8 @@ import be.nabu.eai.module.authentication.oauth2.OAuth2Listener;
 import be.nabu.eai.module.authentication.oauth2.OAuth2Token;
 import be.nabu.eai.module.http.server.HTTPServerArtifact;
 import be.nabu.eai.module.web.application.WebApplication;
+import be.nabu.eai.module.web.application.WebFragment;
+import be.nabu.eai.module.web.application.WebFragmentProvider;
 import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.http.HTTPException;
 import be.nabu.libs.http.api.HTTPRequest;
@@ -130,10 +132,12 @@ public class Services {
 		if (webApplication == null) {
 			throw new IllegalStateException("Can not find web application: " + webApplicationId);
 		}
-		else if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
+		if (!isIncluded(oauth2, webApplication)) {
+			throw new IllegalStateException("The oauth2 provider '" + oAuth2ArtifactId + "' is not included in the web application: " + webApplicationId);
+		}
+		if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
 			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
 		}
-
 		ComplexContent configuration = webApplication.getConfigurationFor(oauth2.getConfig().getServerPath() == null ? "/" : oauth2.getConfig().getServerPath(), oauth2.getConfigurationType());
 		StringBuilder builder = new StringBuilder();
 		if (oauth2.getConfiguration().getScopes() != null) {
@@ -152,7 +156,11 @@ public class Services {
 			return null;
 		}
 
-		String redirectLink = getRedirectLink(oauth2, webApplication);
+		URI configuredRedirectLink = oauth2.getConfiguration().getRedirectLink();
+		if (configuration != null && configuration.get("redirectLink") != null) {
+			configuredRedirectLink = (URI) configuration.get("redirectLink");
+		}
+		String redirectLink = configuredRedirectLink == null ? getRedirectLink(oauth2, webApplication) : configuredRedirectLink.toString();
 		
 		String clientId = oauth2.getConfiguration().getClientId();
 		if (configuration != null && configuration.get("clientId") != null) {
@@ -193,6 +201,23 @@ public class Services {
 		return endpoint;
 	}
 
+	private boolean isIncluded(OAuth2Artifact oauth2, WebFragmentProvider provider) {
+		if (provider.getWebFragments() != null) {
+			for (WebFragment fragment : provider.getWebFragments()) {
+				if (oauth2.equals(fragment)) {
+					return true;
+				}
+				else if (fragment instanceof WebFragmentProvider) {
+					boolean result = isIncluded(oauth2, (WebFragmentProvider) fragment);
+					if (result) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+	
 	private String getRedirectLink(OAuth2Artifact oauth2, WebApplication webApplication) throws IOException {
 		HTTPServerArtifact httpServer = webApplication.getConfiguration().getVirtualHost().getConfiguration().getServer();
 		if (httpServer == null) {

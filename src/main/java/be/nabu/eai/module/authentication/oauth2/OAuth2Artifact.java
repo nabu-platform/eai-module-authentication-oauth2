@@ -141,6 +141,7 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 			configuration.add(new SimpleElementImpl<URI>("loginEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
 			configuration.add(new SimpleElementImpl<URI>("tokenEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
 			configuration.add(new SimpleElementImpl<URI>("apiEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+			configuration.add(new SimpleElementImpl<URI>("redirectLink", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
 		}
 		return configuration;
 	}

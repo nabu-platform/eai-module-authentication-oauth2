@@ -9,6 +9,7 @@ import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 import be.nabu.eai.api.Advanced;
+import be.nabu.eai.api.Comment;
 import be.nabu.eai.api.EnvironmentSpecific;
 import be.nabu.eai.api.InterfaceFilter;
 import be.nabu.eai.module.http.client.HTTPClientArtifact;
@@ -17,7 +18,7 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm", "redirectLink" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -36,6 +37,7 @@ public class OAuth2Configuration {
 	private URI loginEndpoint;
 	private URI tokenEndpoint;
 	private URI apiEndpoint;
+	private URI redirectLink;
 	private HTTPClientArtifact httpClient;
 	private String serverPath;
 	private String errorPath, successPath;
@@ -195,6 +197,16 @@ public class OAuth2Configuration {
 	}
 	public void setJwtUseOriginalRealm(boolean jwtUseOriginalRealm) {
 		this.jwtUseOriginalRealm = jwtUseOriginalRealm;
+	}
+	
+	@Advanced
+	@EnvironmentSpecific
+	@Comment(title = "You can override the automatically generated redirect link here, this can be useful for example in environments with reverse proxies")
+	public URI getRedirectLink() {
+		return redirectLink;
+	}
+	public void setRedirectLink(URI redirectLink) {
+		this.redirectLink = redirectLink;
 	}
 	
 }

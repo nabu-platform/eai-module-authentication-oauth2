@@ -89,7 +89,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 	}
 	
-	private String getFullPath(String childPath) throws IOException {
+	private String getFullPath(String childPath, URI redirectLink) throws IOException {
 		// it is already an absolute path
 		if (childPath.startsWith("http://") || childPath.startsWith("https://")) {
 			return childPath;
@@ -102,9 +102,12 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			path += "/" + childPath;
 		}
 		path = path.replaceAll("[/]{2,}", "/");
-		String host = application.getConfiguration().getVirtualHost().getConfiguration().getHost();
-		Integer port = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getPort();
-		boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
+		String host = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getHost() : redirectLink.getHost();
+		Integer port = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getPort() : Integer.valueOf(redirectLink.getPort());
+		if (port != null && port < 0) {
+			port = null;
+		}
+		boolean secure = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null : "https".equalsIgnoreCase(redirectLink.getScheme());
 		return (secure ? "https://" : "http://") + host + (port == null ? "" : ":" + port) + (path.startsWith("/") ? "" : "/") + path;
 	}
 	
@@ -114,6 +117,8 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
 			URI uri = HTTPUtils.getURI(event, secure);
 			Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
+			ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+			URI redirectLink = clientConfiguration == null ? null : (URI) clientConfiguration.get("redirectLink");
 			if (queryProperties.containsKey("error") || !queryProperties.containsKey("code")) {
 				logger.error("Failed oauth2 login: " + queryProperties);
 				if (artifact.getConfiguration().getErrorPath() == null) {
@@ -121,7 +126,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				}
 				return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 					new PlainMimeEmptyPart(null, 
-						new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath())),
+						new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath(), redirectLink)),
 						new MimeHeader("Content-Length", "0"))
 				);
 			}
@@ -151,7 +156,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					HTTPRequest request = buildTokenRequest(application, artifact, uri, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null);
+					HTTPRequest request = buildTokenRequest(application, artifact, redirectLink == null ? uri : redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null);
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
@@ -190,7 +195,6 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							deviceId = UUID.randomUUID().toString().replace("-", "");
 							isNewDevice = true;
 						}
-						ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
 						URI apiEndpoint = artifact.getConfig().getApiEndpoint();
 						if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
 							apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
@@ -253,7 +257,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
 					// set the correct headers to update the session
 					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
-					responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath())));
+					responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath(), redirectLink)));
 					responseHeaders.add(new MimeHeader("Content-Length", "0"));
 					logger.debug("Sending back 307");
 					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
