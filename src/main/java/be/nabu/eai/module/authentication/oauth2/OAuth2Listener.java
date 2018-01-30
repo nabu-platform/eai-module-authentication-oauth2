@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import be.nabu.eai.module.authentication.oauth2.OAuth2Configuration.TokenResolverType;
 import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
+import be.nabu.eai.module.http.server.HTTPServerArtifact;
 import be.nabu.eai.module.keystore.KeyStoreArtifact;
 import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.repository.EAIResourceRepository;
@@ -103,11 +104,12 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		path = path.replaceAll("[/]{2,}", "/");
 		String host = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getHost() : redirectLink.getHost();
-		Integer port = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getPort() : Integer.valueOf(redirectLink.getPort());
+		HTTPServerArtifact server = application.getConfiguration().getVirtualHost().getConfiguration().getServer();
+		Integer port = redirectLink == null ? (server.getConfig().isProxied() ? server.getConfig().getProxyPort() : server.getConfiguration().getPort()) : Integer.valueOf(redirectLink.getPort());
 		if (port != null && port < 0) {
 			port = null;
 		}
-		boolean secure = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null : "https".equalsIgnoreCase(redirectLink.getScheme());
+		boolean secure = redirectLink == null ? (server.getConfig().isProxied() ? server.getConfig().isProxySecure() : server.getConfiguration().getKeystore() != null) : "https".equalsIgnoreCase(redirectLink.getScheme());
 		return (secure ? "https://" : "http://") + host + (port == null ? "" : ":" + port) + (path.startsWith("/") ? "" : "/") + path;
 	}
 	
@@ -156,7 +158,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					HTTPRequest request = buildTokenRequest(application, artifact, redirectLink == null ? uri : redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null);
+					HTTPRequest request = buildTokenRequest(application, artifact, redirectLink == null ? uri : redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null);
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
@@ -330,7 +332,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		return tokenEndpoint.getScheme().equals("https");
 	}
 
-	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI, String resource) throws IOException, UnsupportedEncodingException {
+	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI, String resource, String username, String password) throws IOException, UnsupportedEncodingException {
 		if (grantType == null) {
 			grantType = GrantType.AUTHORIZATION;
 		}
@@ -352,10 +354,37 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		
 		// by default we get a code in through a redirect and we send it along
 		// for a refresh we have an existing refresh token and we send that
-		String requestContent = (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token=") + URIUtils.encodeURIComponent(code, false) 
-			+ "&client_id=" + URIUtils.encodeURIComponent(clientId, false)
+		String requestContent = "";
+		if (code != null) {
+			requestContent += (grantType == GrantType.AUTHORIZATION ? "code=" : "refresh_token=") + URIUtils.encodeURIComponent(code, false) + "&";
+		}
+		requestContent += "client_id=" + URIUtils.encodeURIComponent(clientId, false)
 			+ "&client_secret=" + URIUtils.encodeURIComponent(clientSecret, false)
 			+ "&grant_type=" + grantType.getGrantName();
+	
+		if (username != null) {
+			requestContent += "&username=" + URIUtils.encodeURIComponent(username, false);
+		}
+		if (password != null) {
+			requestContent += "&password=" + URIUtils.encodeURIComponent(password, false);
+		}
+		
+		if (grantType == GrantType.PASSWORD) {
+			List<String> scopes = artifact.getConfig().getScopes();
+			if (scopes != null && !scopes.isEmpty()) {
+				requestContent += "&scope=";
+				boolean first = true;
+				for (String scope : scopes) {
+					if (first) {
+						first = false;
+					}
+					else {
+						requestContent += " ";
+					}
+					requestContent += scope;
+				}
+			}
+		}
 		
 		// for most providers, the redirect uri is required (e.g. google), but for example for digipolis it is not allowed, you will get exceptions if you send it along
 		if (includeRedirectURI) {

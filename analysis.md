@@ -123,3 +123,7 @@ More information: https://developer-programs.linkedin.com/documents/profile-api
 For business apps are documented [here](https://dev.onedrive.com/app-registration.htm#register-your-app-for-onedrive-for-business)
 
 Register app [here](https://apps.dev.microsoft.com/?referrer=https%3A%2F%2Fdev.onedrive.com%2Fapp-registration.htm) or once logged in [here](https://apps.dev.microsoft.com/#/appList).
+
+# Additonal information
+
+- [password grants](https://auth0.com/docs/api-auth/tutorials/password-grant)
