@@ -135,7 +135,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			else {
 				boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
 				Session session = application.getSessionResolver().getSession(event.getContent().getHeaders());
-				if (session != null) {
+				if (session != null && mustValidateState) {
 					String oauth2Token = (String) session.get(Services.OAUTH2_TOKEN);
 					// check the token
 					if (oauth2Token != null) {
@@ -369,7 +369,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			requestContent += "&password=" + URIUtils.encodeURIComponent(password, false);
 		}
 		
-		if (grantType == GrantType.PASSWORD) {
+		if (grantType == GrantType.PASSWORD || grantType == GrantType.CLIENT) {
 			List<String> scopes = artifact.getConfig().getScopes();
 			if (scopes != null && !scopes.isEmpty()) {
 				requestContent += "&scope=";
