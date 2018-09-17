@@ -77,6 +77,9 @@ public class OAuth2Token implements RefreshableToken {
 	public OAuth2Identity getOAuth2Token() {
 		return token;
 	}
+	public void setOAuth2Token(OAuth2Identity identity) {
+		this.token = identity;
+	}
 
 	@Override
 	public Token refresh() {
@@ -114,5 +117,20 @@ public class OAuth2Token implements RefreshableToken {
 		}
 		return null;
 	}
-	
+
+	public void setRealm(String realm) {
+		this.realm = realm;
+	}
+
+	public void setValidUntil(Date validUntil) {
+		this.validUntil = validUntil;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public void setCredentials(List<Principal> credentials) {
+		this.credentials = credentials;
+	}
 }

@@ -23,10 +23,13 @@ import be.nabu.libs.http.api.HTTPResponse;
 import be.nabu.libs.http.server.HTTPServerUtils;
 import be.nabu.libs.resources.api.ResourceContainer;
 import be.nabu.libs.types.SimpleTypeWrapperFactory;
+import be.nabu.libs.types.api.ComplexContent;
 import be.nabu.libs.types.api.ComplexType;
 import be.nabu.libs.types.api.DefinedType;
 import be.nabu.libs.types.api.Element;
 import be.nabu.libs.types.base.SimpleElementImpl;
+import be.nabu.libs.types.base.ValueImpl;
+import be.nabu.libs.types.properties.MinOccursProperty;
 import be.nabu.libs.types.structure.DefinedStructure;
 
 public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements WebFragment {
@@ -61,21 +64,26 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 
 	@Override
 	public void start(WebApplication application, String path) throws IOException {
-		String key = getKey(application, path);
-		if (subscriptions.containsKey(key)) {
-			stop(application, path);
-		}
-		String artifactPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
-		if (artifactPath.endsWith("/")) {
-			artifactPath = artifactPath.substring(0, artifactPath.length() - 1);
-		}
-		if (getConfiguration().getServerPath() != null && !getConfiguration().getServerPath().isEmpty()) {
-			artifactPath += (getConfiguration().getServerPath().startsWith("/") ? "" : "/") + getConfiguration().getServerPath();
-		}
-		if (application.getConfiguration().getVirtualHost() != null) {
-			EventSubscription<HTTPRequest, HTTPResponse> subscription = application.getConfiguration().getVirtualHost().getDispatcher().subscribe(HTTPRequest.class, new OAuth2Listener(application, path, this));
-			subscription.filter(HTTPServerUtils.limitToPath(artifactPath));
-			subscriptions.put(key, subscription);
+		ComplexContent configuration = application.getConfigurationFor(getConfig().getServerPath() == null ? "/" : getConfig().getServerPath(), getConfigurationType());
+		Boolean enabled = configuration == null ? null : (Boolean) configuration.get("enabled");
+		
+		if (enabled == null || enabled) {
+			String key = getKey(application, path);
+			if (subscriptions.containsKey(key)) {
+				stop(application, path);
+			}
+			String artifactPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
+			if (artifactPath.endsWith("/")) {
+				artifactPath = artifactPath.substring(0, artifactPath.length() - 1);
+			}
+			if (getConfiguration().getServerPath() != null && !getConfiguration().getServerPath().isEmpty()) {
+				artifactPath += (getConfiguration().getServerPath().startsWith("/") ? "" : "/") + getConfiguration().getServerPath();
+			}
+			if (application.getConfiguration().getVirtualHost() != null) {
+				EventSubscription<HTTPRequest, HTTPResponse> subscription = application.getConfiguration().getVirtualHost().getDispatcher().subscribe(HTTPRequest.class, new OAuth2Listener(application, path, this));
+				subscription.filter(HTTPServerUtils.limitToPath(artifactPath));
+				subscriptions.put(key, subscription);
+			}
 		}
 	}
 
@@ -138,10 +146,14 @@ public class OAuth2Artifact extends JAXBArtifact<OAuth2Configuration> implements
 			configuration.setId(getId() + ".oauth2Configuration");
 			configuration.add(new SimpleElementImpl<String>("clientId", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration));
 			configuration.add(new SimpleElementImpl<String>("clientSecret", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration));
-			configuration.add(new SimpleElementImpl<URI>("loginEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
-			configuration.add(new SimpleElementImpl<URI>("tokenEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
-			configuration.add(new SimpleElementImpl<URI>("apiEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
-			configuration.add(new SimpleElementImpl<URI>("redirectLink", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+			configuration.add(new SimpleElementImpl<String>("name", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(String.class), configuration, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
+			if (getConfig().isMultipleEnvironments()) {
+				configuration.add(new SimpleElementImpl<URI>("loginEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+				configuration.add(new SimpleElementImpl<URI>("tokenEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+				configuration.add(new SimpleElementImpl<URI>("apiEndpoint", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+				configuration.add(new SimpleElementImpl<URI>("redirectLink", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(URI.class), configuration));
+			}
+			configuration.add(new SimpleElementImpl<Boolean>("enabled", SimpleTypeWrapperFactory.getInstance().getWrapper().wrap(Boolean.class), configuration, new ValueImpl<Integer>(MinOccursProperty.getInstance(), 0)));
 		}
 		return configuration;
 	}

@@ -18,7 +18,7 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm", "redirectLink" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm", "redirectLink", "multipleEnvironments", "requireApprovalPrompt" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -48,7 +48,8 @@ public class OAuth2Configuration {
 
 	private String jwtKeyAlias;
 	private KeyStoreArtifact jwtKeyStore;
-	private boolean jwtUseOriginalRealm;
+	private boolean jwtUseOriginalRealm, multipleEnvironments;
+	private boolean requireApprovalPrompt;
 	
 	@EnvironmentSpecific
 	@NotNull
@@ -208,5 +209,24 @@ public class OAuth2Configuration {
 	public void setRedirectLink(URI redirectLink) {
 		this.redirectLink = redirectLink;
 	}
+	
+	@Advanced
+	@Comment(title = "Most providers (e.g. facebook, google,...) have only one environment: their prd. However custom providers might have multiple, set this to enable that")
+	public boolean isMultipleEnvironments() {
+		return multipleEnvironments;
+	}
+	public void setMultipleEnvironments(boolean multipleEnvironments) {
+		this.multipleEnvironments = multipleEnvironments;
+	}
+	
+	@Advanced
+	@Comment(title = "Some providers require this boolean toggled for redirect links (e.g. google). You can override the value by explicitly setting it when generating a redirect link")
+	public boolean isRequireApprovalPrompt() {
+		return requireApprovalPrompt;
+	}
+	public void setRequireApprovalPrompt(boolean requireApprovalPrompt) {
+		this.requireApprovalPrompt = requireApprovalPrompt;
+	}
+
 	
 }

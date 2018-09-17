@@ -168,6 +168,9 @@ public class Services {
 		if (oauth2 == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
+		if (approvalPrompt == null) {
+			approvalPrompt = oauth2.getConfig().isRequireApprovalPrompt();
+		}
 		WebApplication webApplication = executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
 		if (webApplication == null) {
 			throw new IllegalStateException("Can not find web application: " + webApplicationId);
@@ -307,5 +310,4 @@ public class Services {
 			return grantName;
 		}
 	}
-	
 }
