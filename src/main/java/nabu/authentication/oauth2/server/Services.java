@@ -9,6 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.text.ParseException;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import javax.jws.WebParam;
@@ -115,7 +116,7 @@ public class Services {
 			throw new IllegalStateException("Can not find web application: " + webApplicationId);
 		}
 		HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false, resource, null, null);
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, refreshToken, GrantType.REFRESH, false, resource, null, null, null, null, null, null);
 		HTTPResponse response = newClient.execute(request, null, OAuth2Listener.isSecureTokenEndpoint(webApplication, artifact), true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -126,13 +127,13 @@ public class Services {
 	// this is a simple way to get a token if you have the username and password
 	// this is the oauth2 equivalent of basic auth
 	@WebResult(name = "credentials")
-	public OAuth2Identity newPasswordToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "username") String username, @NotNull @WebParam(name = "password") String password, @WebParam(name = "resource") String resource) throws UnsupportedEncodingException, IOException, URISyntaxException, ParseException, KeyStoreException, NoSuchAlgorithmException, FormatException {
+	public OAuth2Identity newPasswordToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "username") String username, @NotNull @WebParam(name = "password") String password, @WebParam(name = "resource") String resource, @WebParam(name = "clientId") String clientId, @WebParam(name = "clientSecret") String clientSecret, @WebParam(name = "scopes") List<String> scopes) throws UnsupportedEncodingException, IOException, URISyntaxException, ParseException, KeyStoreException, NoSuchAlgorithmException, FormatException {
 		OAuth2Artifact artifact = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (artifact == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
 		HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(null, artifact, null, null, GrantType.PASSWORD, false, resource, username, password);
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(null, artifact, null, null, GrantType.PASSWORD, false, resource, username, password, null, clientId, clientSecret, scopes);
 		HTTPResponse response = newClient.execute(request, null, OAuth2Listener.isSecureTokenEndpoint(null, artifact), true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
@@ -144,17 +145,17 @@ public class Services {
 	// presumably the initial creation involved user interaction so the resource is bound to the user and yourself
 	// if you need offline access, it can be enough to use client credentials rather then refresh token for client credentials
 	@WebResult(name = "credentials")
-	public OAuth2Identity newClientToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @WebParam(name = "resource") String resource) throws UnsupportedEncodingException, IOException, URISyntaxException, ParseException, KeyStoreException, NoSuchAlgorithmException, FormatException {
+	public OAuth2Identity newClientToken(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @WebParam(name = "webApplicationId") String webApplicationId, @WebParam(name = "resource") String resource, @WebParam(name = "clientId") String clientId, @WebParam(name = "clientSecret") String clientSecret, @WebParam(name = "scopes") List<String> scopes) throws UnsupportedEncodingException, IOException, URISyntaxException, ParseException, KeyStoreException, NoSuchAlgorithmException, FormatException {
 		OAuth2Artifact artifact = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (artifact == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
 		}
-		WebApplication webApplication = executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
-		if (webApplication == null) {
+		WebApplication webApplication = webApplicationId == null ? null : executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
+		if (webApplicationId != null && webApplication == null) {
 			throw new IllegalStateException("Can not find web application: " + webApplicationId);
 		}
 		HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, null, GrantType.CLIENT, false, resource, null, null);
+		HTTPRequest request = OAuth2Listener.buildTokenRequest(webApplication, artifact, null, null, GrantType.CLIENT, false, resource, null, null, null, clientId, clientSecret, scopes);
 		HTTPResponse response = newClient.execute(request, null, OAuth2Listener.isSecureTokenEndpoint(null, artifact), true);
 		if (response.getCode() != 200) {
 			throw new HTTPException(500, "Could not retrieve access token based on code: " + response);

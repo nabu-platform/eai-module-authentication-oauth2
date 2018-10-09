@@ -116,11 +116,19 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 	@Override
 	public HTTPResponse handle(HTTPRequest event) {
 		try {
+			// by default we determine secure based on the availability of the keystore
 			boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
+			// or if it is proxies, on the proxy security
+			if (application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxied()) {
+				secure = application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxySecure();
+			}
 			URI uri = HTTPUtils.getURI(event, secure);
 			Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
 			ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
 			URI redirectLink = clientConfiguration == null ? null : (URI) clientConfiguration.get("redirectLink");
+			if (redirectLink == null) {
+				redirectLink = uri;
+			}
 			if (queryProperties.containsKey("error") || !queryProperties.containsKey("code")) {
 				logger.error("Failed oauth2 login: " + queryProperties);
 				if (artifact.getConfiguration().getErrorPath() == null) {
@@ -128,7 +136,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				}
 				return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 					new PlainMimeEmptyPart(null, 
-						new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath(), redirectLink)),
+						new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink)),
 						new MimeHeader("Content-Length", "0"))
 				);
 			}
@@ -158,7 +166,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				String code = queryProperties.get("code").get(0);
 				HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
 				try {
-					HTTPRequest request = buildTokenRequest(application, artifact, redirectLink == null ? uri : redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null);
+					HTTPRequest request = buildTokenRequest(application, artifact, redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null, null, null, null, null);
 					logger.debug("Requesting token based on code: " + code);
 					HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
 					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
@@ -259,7 +267,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
 					// set the correct headers to update the session
 					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
-					responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath(), redirectLink)));
+					responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink)));
 					responseHeaders.add(new MimeHeader("Content-Length", "0"));
 					logger.debug("Sending back 307");
 					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
@@ -332,21 +340,26 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		return tokenEndpoint.getScheme().equals("https");
 	}
 
-	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI, String resource, String username, String password) throws IOException, UnsupportedEncodingException {
+	public static HTTPRequest buildTokenRequest(WebApplication webApplication, OAuth2Artifact artifact, URI redirectURI, String code, GrantType grantType, Boolean includeRedirectURI, String resource, String username, String password,
+				URI tokenEndpoint, String clientId, String clientSecret, List<String> scopes) throws IOException, UnsupportedEncodingException {
 		if (grantType == null) {
 			grantType = GrantType.AUTHORIZATION;
 		}
 		if (includeRedirectURI == null) {
 			includeRedirectURI = true;
 		}
-		String clientId = artifact.getConfig().getClientId();
-		String clientSecret = artifact.getConfig().getClientSecret();
-		ComplexContent clientConfiguration = webApplication == null ? null : webApplication.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
-		if (clientConfiguration != null && clientConfiguration.get("clientId") != null) {
+		ComplexContent clientConfiguration = webApplication == null || artifact == null ? null : webApplication.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+		if (clientConfiguration != null && clientConfiguration.get("clientId") != null && clientId == null) {
 			clientId = (String) clientConfiguration.get("clientId");
 		}
-		if (clientConfiguration != null && clientConfiguration.get("clientSecret") != null) {
+		if (clientConfiguration != null && clientConfiguration.get("clientSecret") != null && clientSecret == null) {
 			clientSecret = (String) clientConfiguration.get("clientSecret");
+		}
+		if (clientId == null) {
+			clientId = artifact.getConfig().getClientId();
+		}
+		if (clientSecret == null) {
+			clientSecret = artifact.getConfig().getClientSecret();
 		}
 		if (clientId == null) {
 			throw new IllegalArgumentException("Could not find client id");
@@ -370,7 +383,9 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		
 		if (grantType == GrantType.PASSWORD || grantType == GrantType.CLIENT) {
-			List<String> scopes = artifact.getConfig().getScopes();
+			if (artifact != null && (scopes == null || scopes.isEmpty())) {
+				scopes = artifact.getConfig().getScopes();
+			}
 			if (scopes != null && !scopes.isEmpty()) {
 				requestContent += "&scope=";
 				boolean first = true;
@@ -387,10 +402,10 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		
 		// for most providers, the redirect uri is required (e.g. google), but for example for digipolis it is not allowed, you will get exceptions if you send it along
-		if (includeRedirectURI) {
+		if (includeRedirectURI && redirectURI != null) {
 			requestContent += "&redirect_uri=" + URIUtils.encodeURI(redirectURI.toString().replaceAll("\\?.*", ""));
 		}
-		if (resource == null) {
+		if (resource == null && artifact != null) {
 			resource = artifact.getConfiguration().getResource();
 		}
 		// for microsoft
@@ -399,12 +414,14 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		logger.debug("Token request content: {}", requestContent);
 		HTTPRequest request;
-		// facebook uses GET logic
-		URI tokenEndpoint = artifact.getConfiguration().getTokenEndpoint();
-		if (clientConfiguration != null && clientConfiguration.get("tokenEndpoint") != null) {
+		if (tokenEndpoint == null && clientConfiguration != null && clientConfiguration.get("tokenEndpoint") != null) {
 			tokenEndpoint = (URI) clientConfiguration.get("tokenEndpoint");
 		}
-		if (TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
+		if (tokenEndpoint == null) {
+			tokenEndpoint = artifact.getConfiguration().getTokenEndpoint();
+		}
+		// facebook uses GET logic
+		if (artifact != null && TokenResolverType.GET.equals(artifact.getConfiguration().getTokenResolvingType())) {
 			logger.debug("Creating GET request for token request");
 			request = new DefaultHTTPRequest("GET", tokenEndpoint.getPath() + (tokenEndpoint.getPath().contains("?") ? "&" : "?") + requestContent, new PlainMimeEmptyPart(null,  
 				new MimeHeader("Host", tokenEndpoint.getAuthority()),

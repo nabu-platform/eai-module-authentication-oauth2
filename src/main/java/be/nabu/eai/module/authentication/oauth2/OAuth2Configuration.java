@@ -52,7 +52,6 @@ public class OAuth2Configuration {
 	private boolean requireApprovalPrompt;
 	
 	@EnvironmentSpecific
-	@NotNull
 	public String getClientId() {
 		return clientId;
 	}
@@ -61,7 +60,6 @@ public class OAuth2Configuration {
 	}
 	
 	@EnvironmentSpecific
-	@NotNull
 	public String getClientSecret() {
 		return clientSecret;
 	}
@@ -103,7 +101,6 @@ public class OAuth2Configuration {
 	}
 	
 	@EnvironmentSpecific
-	@NotNull
 	public URI getLoginEndpoint() {
 		return loginEndpoint;
 	}
@@ -112,7 +109,6 @@ public class OAuth2Configuration {
 	}
 	
 	@EnvironmentSpecific
-	@NotNull
 	public URI getApiEndpoint() {
 		return apiEndpoint;
 	}
@@ -120,7 +116,6 @@ public class OAuth2Configuration {
 		this.apiEndpoint = apiEndpoint;
 	}
 	
-	@NotNull
 	public String getServerPath() {
 		return serverPath;
 	}
