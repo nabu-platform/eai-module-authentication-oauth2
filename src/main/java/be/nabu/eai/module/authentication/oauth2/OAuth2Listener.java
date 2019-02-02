@@ -81,12 +81,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		// load any configuration that applies
 		if (authenticatorService != null) {
 			Method method = WebApplication.getMethod(OAuth2Authenticator.class, "authenticate");
-			try {
-				authenticatorService = application.wrap(artifact.getConfig().getAuthenticatorService(), method);
-			}
-			catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+			authenticatorService = application.wrap(artifact.getConfig().getAuthenticatorService(), method);
 		}
 	}
 	
@@ -115,117 +110,136 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 	
 	@Override
 	public HTTPResponse handle(HTTPRequest event) {
+		URI redirectLink = null;
 		try {
-			// by default we determine secure based on the availability of the keystore
-			boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
-			// or if it is proxies, on the proxy security
-			if (application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxied()) {
-				secure = application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxySecure();
-			}
-			URI uri = HTTPUtils.getURI(event, secure);
-			Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
-			ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
-			URI redirectLink = clientConfiguration == null ? null : (URI) clientConfiguration.get("redirectLink");
-			if (redirectLink == null) {
-				redirectLink = uri;
-			}
-			if (queryProperties.containsKey("error") || !queryProperties.containsKey("code")) {
-				logger.error("Failed oauth2 login: " + queryProperties);
-				if (artifact.getConfiguration().getErrorPath() == null) {
-					throw new HTTPException(500, "The login failed: " + queryProperties.get("error") + " - " + queryProperties.get("error_description"));
+			try {
+				// by default we determine secure based on the availability of the keystore
+				boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
+				// or if it is proxies, on the proxy security
+				if (application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxied()) {
+					secure = application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxySecure();
 				}
-				return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
-					new PlainMimeEmptyPart(null, 
-						new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink)),
-						new MimeHeader("Content-Length", "0"))
-				);
-			}
-			else {
-				boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
-				Session session = application.getSessionResolver().getSession(event.getContent().getHeaders());
-				if (session != null && mustValidateState) {
-					String oauth2Token = (String) session.get(Services.OAUTH2_TOKEN);
-					// check the token
-					if (oauth2Token != null) {
-						logger.debug("Checking csrf token for oauth2: " + oauth2Token);
-						if (!queryProperties.containsKey("state")) {
-							throw new HTTPException(400, "No csrf token found for oauth2 authentication");
+				URI uri = HTTPUtils.getURI(event, secure);
+				Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
+				ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());
+				redirectLink = clientConfiguration == null ? null : (URI) clientConfiguration.get("redirectLink");
+				if (redirectLink == null) {
+					redirectLink = uri;
+				}
+				if (queryProperties.containsKey("error") || !queryProperties.containsKey("code")) {
+					logger.error("Failed oauth2 login: " + queryProperties);
+					if (artifact.getConfiguration().getErrorPath() == null) {
+						throw new HTTPException(500, "The login failed: " + queryProperties.get("error") + " - " + queryProperties.get("error_description"));
+					}
+					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
+						new PlainMimeEmptyPart(null, 
+							new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink)),
+							new MimeHeader("Content-Length", "0"))
+					);
+				}
+				else {
+					boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
+					Session session = application.getSessionResolver().getSession(event.getContent().getHeaders());
+					if (session != null && mustValidateState) {
+						String oauth2Token = (String) session.get(Services.OAUTH2_TOKEN);
+						// check the token
+						if (oauth2Token != null) {
+							logger.debug("Checking csrf token for oauth2: " + oauth2Token);
+							if (!queryProperties.containsKey("state")) {
+								throw new HTTPException(400, "No csrf token found for oauth2 authentication");
+							}
+							else if (!oauth2Token.equals(queryProperties.get("state").get(0))) {
+								throw new HTTPException(400, "Possible csrf attack, the oauth2 token '" + oauth2Token + "' does not match the return state '" + queryProperties.get("state").get(0) + "'");
+							}
 						}
-						else if (!oauth2Token.equals(queryProperties.get("state").get(0))) {
-							throw new HTTPException(400, "Possible csrf attack, the oauth2 token '" + oauth2Token + "' does not match the return state '" + queryProperties.get("state").get(0) + "'");
+						else if (mustValidateState) {
+							throw new HTTPException(400, "No oauth2 state token found in the session, can not validate");
 						}
 					}
 					else if (mustValidateState) {
-						throw new HTTPException(400, "No oauth2 state token found in the session, can not validate");
+						throw new HTTPException(400, "No session found, can not validate oauth2 state token");
 					}
-				}
-				else if (mustValidateState) {
-					throw new HTTPException(400, "No session found, can not validate oauth2 state token");
-				}
-				logger.debug("OAuth2 login successful, code retrieved");
-				String code = queryProperties.get("code").get(0);
-				HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-				try {
-					HTTPRequest request = buildTokenRequest(application, artifact, redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null, null, null, null, null);
-					logger.debug("Requesting token based on code: " + code);
-					HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
-					logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
-					if (response.getCode() != 200) {
-						throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
-					}
-					OAuth2IdentityWithContext unmarshalled = getIdentityFromResponse(response);
-					unmarshalled.setOauth2Provider(artifact.getId());
-					unmarshalled.setWebApplication(application.getId());
-					logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
-					Token token = null;
-					List<Header> responseHeaders = new ArrayList<Header>();
-					String webApplicationPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
-					// if we don't want to map it to an internal representation of the user, send it back as is
-					if (authenticatorService == null) {
-						token = new OAuth2Token(unmarshalled, application.getRealm());
-						JWTToken jwtToken = getJWTToken(artifact, application.getRealm(), unmarshalled);
-						if (jwtToken != null) {
-							token.getCredentials().add(jwtToken);
+					logger.debug("OAuth2 login successful, code retrieved");
+					String code = queryProperties.get("code").get(0);
+					HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
+					try {
+						HTTPRequest request = buildTokenRequest(application, artifact, redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null, null, null, null, null);
+						logger.debug("Requesting token based on code: " + code);
+						HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
+						logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
+						if (response.getCode() != 200) {
+							throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
 						}
-					}
-					else {
-						OAuth2Authenticator proxy = POJOUtils.newProxy(
-							OAuth2Authenticator.class, 
-							artifact.getRepository(),
-							SystemPrincipal.ROOT,
-							authenticatorService
-						);
-						
-						// get the cookies, we want to see if there is a device id yet
-						Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
-						boolean isNewDevice = false;
-						List<String> cookieValues = cookies.get("Device-" + application.getRealm());
-						String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
-						if (deviceId == null) {
-							deviceId = UUID.randomUUID().toString().replace("-", "");
-							isNewDevice = true;
+						OAuth2IdentityWithContext unmarshalled = getIdentityFromResponse(response);
+						unmarshalled.setOauth2Provider(artifact.getId());
+						unmarshalled.setWebApplication(application.getId());
+						logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
+						Token token = null;
+						List<Header> responseHeaders = new ArrayList<Header>();
+						String webApplicationPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
+						// if we don't want to map it to an internal representation of the user, send it back as is
+						if (authenticatorService == null) {
+							token = new OAuth2Token(unmarshalled, application.getRealm());
+							JWTToken jwtToken = getJWTToken(artifact, application.getRealm(), unmarshalled);
+							if (jwtToken != null) {
+								token.getCredentials().add(jwtToken);
+							}
 						}
-						URI apiEndpoint = artifact.getConfig().getApiEndpoint();
-						if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
-							apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
-						}
-						logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-						token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
-							deviceId, 
-							GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
-							GlueHTTPUtils.getHost(event.getContent().getHeaders())
-						), apiEndpoint);
-						if (token == null) {
-							throw new HTTPException(500, "Login failed");
-						}
-						logger.debug("Natively authenticated as: " + token.getName());
-						// if it's a new device, set a cookie for it
-						if (isNewDevice) {
-							responseHeaders.add(HTTPUtils.newSetCookieHeader(
-								"Device-" + application.getRealm(), 
+						else {
+							OAuth2Authenticator proxy = POJOUtils.newProxy(
+								OAuth2Authenticator.class, 
+								artifact.getRepository(),
+								SystemPrincipal.ROOT,
+								authenticatorService
+							);
+							
+							// get the cookies, we want to see if there is a device id yet
+							Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
+							boolean isNewDevice = false;
+							List<String> cookieValues = cookies.get("Device-" + application.getRealm());
+							String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
+							if (deviceId == null) {
+								deviceId = UUID.randomUUID().toString().replace("-", "");
+								isNewDevice = true;
+							}
+							URI apiEndpoint = artifact.getConfig().getApiEndpoint();
+							if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
+								apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
+							}
+							logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
+							token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 								deviceId, 
-								// Set it to 100 years in the future
-								new Date(new Date().getTime() + 1000l*60*60*24*365*100),
+								GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
+								GlueHTTPUtils.getHost(event.getContent().getHeaders())
+							), apiEndpoint);
+							if (token == null) {
+								throw new HTTPException(500, "Login failed");
+							}
+							logger.debug("Natively authenticated as: " + token.getName());
+							// if it's a new device, set a cookie for it
+							if (isNewDevice) {
+								responseHeaders.add(HTTPUtils.newSetCookieHeader(
+									"Device-" + application.getRealm(), 
+									deviceId, 
+									// Set it to 100 years in the future
+									new Date(new Date().getTime() + 1000l*60*60*24*365*100),
+									// path
+									webApplicationPath, 
+									// domain
+									null, 
+									// secure
+									secure,
+									// http only
+									true
+								));
+							}
+						}
+						if (token instanceof TokenWithSecret && ((TokenWithSecret) token).getSecret() != null) {
+							responseHeaders.add(HTTPUtils.newSetCookieHeader(
+								"Realm-" + application.getRealm(), 
+								token.getName() + "/" + ((TokenWithSecret) token).getSecret(), 
+								// if there is no valid until in the token, set it to a year
+								token.getValidUntil() == null ? new Date(new Date().getTime() + 1000l*60*60*24*365) : token.getValidUntil(),
 								// path
 								webApplicationPath, 
 								// domain
@@ -236,60 +250,61 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 								true
 							));
 						}
-					}
-					if (token instanceof TokenWithSecret && ((TokenWithSecret) token).getSecret() != null) {
-						responseHeaders.add(HTTPUtils.newSetCookieHeader(
-							"Realm-" + application.getRealm(), 
-							token.getName() + "/" + ((TokenWithSecret) token).getSecret(), 
-							// if there is no valid until in the token, set it to a year
-							token.getValidUntil() == null ? new Date(new Date().getTime() + 1000l*60*60*24*365) : token.getValidUntil(),
-							// path
-							webApplicationPath, 
-							// domain
-							null, 
-							// secure
-							secure,
-							// http only
-							true
-						));
-					}
-					logger.debug("Creating new session");
-					// create a new session
-					Session newSession = application.getSessionProvider().newSession();
-					// copy & destroy the old one (if any)
-					if (session != null) {
-						for (String key : session) {
-							newSession.set(key, session.get(key));
+						logger.debug("Creating new session");
+						// create a new session
+						Session newSession = application.getSessionProvider().newSession();
+						// copy & destroy the old one (if any)
+						if (session != null) {
+							for (String key : session) {
+								newSession.set(key, session.get(key));
+							}
+							session.destroy();
 						}
-						session.destroy();
+						// set the token in the session
+						newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
+						// set the correct headers to update the session
+						responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
+						responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink)));
+						responseHeaders.add(new MimeHeader("Content-Length", "0"));
+						logger.debug("Sending back 307");
+						return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
+							new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
+						);
 					}
-					// set the token in the session
-					newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
-					// set the correct headers to update the session
-					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
-					responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink)));
-					responseHeaders.add(new MimeHeader("Content-Length", "0"));
-					logger.debug("Sending back 307");
-					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
-						new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
-					);
+					finally {
+						newClient.close();
+					}
 				}
-				finally {
-					newClient.close();
-				}
+			}
+			catch (HTTPException e) {
+				logger.error("Failed oauth2 authentication", e);
+				throw e;
+			}
+			catch (Exception e) {
+				logger.error("Failed oauth2 authentication", e);
+				throw new HTTPException(500, e);
+			}
+			catch(Error e) {
+				logger.error("Failed oauth2 authentication", e);
+				throw e;
 			}
 		}
 		catch (HTTPException e) {
-			logger.error("Failed oauth2 authentication", e);
-			throw e;
-		}
-		catch (Exception e) {
-			logger.error("Failed oauth2 authentication", e);
-			throw new HTTPException(500, e);
-		}
-		catch(Error e) {
-			logger.error("Failed oauth2 authentication", e);
-			throw e;
+			if (artifact.getConfig().getErrorPath() == null) {
+				throw e;
+			}
+			else {
+				try {
+					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
+						new PlainMimeEmptyPart(null, 
+							new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink == null ? new URI("/") : redirectLink)),
+							new MimeHeader("Content-Length", "0"))
+					);
+				}
+				catch (Exception f) {
+					throw new HTTPException(500, "Could not redirect user to error page", f);
+				}
+			}
 		}
 	}
 
