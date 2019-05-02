@@ -222,7 +222,7 @@ public class Services {
 			+ "&response_type=code";
 		
 		// This is currently only valid for google as far as I know
-		if (accessType != null && AccessType.OFFLINE.equals(accessType)) {
+		if (accessType != null && AccessType.OFFLINE.equals(accessType) && !oauth2.getConfig().isIgnoreAccessType()) {
 			if (approvalPrompt == null || approvalPrompt) {
 				endpoint += "&approval_prompt=force";
 			}
@@ -270,14 +270,14 @@ public class Services {
 		Integer port = httpServer.getConfig().isProxied() ? httpServer.getConfig().getProxyPort() : httpServer.getConfiguration().getPort();
 		if (port != null) {
 			// if the port is the default port, don't include it
-			if (port == 443 && httpServer.getConfiguration().getKeystore() != null) {
+			if (port == 443 && httpServer.isSecure()) {
 				port = null;
 			}
-			else if (port == 80 && httpServer.getConfiguration().getKeystore() == null) {
+			else if (port == 80 && !httpServer.isSecure()) {
 				port = null;
 			}
 		}
-		boolean secure = httpServer.getConfig().isProxied() ? httpServer.getConfig().isProxySecure() : httpServer.getConfiguration().getKeystore() != null;
+		boolean secure = httpServer.isSecure();
 		String redirectLink = (secure ? "https" : "http") + "://" + webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() + (port == null ? "" : ":" + port) + "/";
 		if (webApplication.getConfiguration().getPath() != null && !webApplication.getConfiguration().getPath().isEmpty() && !webApplication.getConfiguration().getPath().equals("/")) {
 			redirectLink += webApplication.getConfiguration().getPath().replaceFirst("^[/]+", "");

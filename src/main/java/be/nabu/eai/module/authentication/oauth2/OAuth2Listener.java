@@ -104,7 +104,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		if (port != null && port < 0) {
 			port = null;
 		}
-		boolean secure = redirectLink == null ? (server.getConfig().isProxied() ? server.getConfig().isProxySecure() : server.getConfiguration().getKeystore() != null) : "https".equalsIgnoreCase(redirectLink.getScheme());
+		boolean secure = redirectLink == null ? server.isSecure() : "https".equalsIgnoreCase(redirectLink.getScheme());
 		return (secure ? "https://" : "http://") + host + (port == null ? "" : ":" + port) + (path.startsWith("/") ? "" : "/") + path;
 	}
 	
@@ -114,11 +114,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		try {
 			try {
 				// by default we determine secure based on the availability of the keystore
-				boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().getConfiguration().getKeystore() != null;
-				// or if it is proxies, on the proxy security
-				if (application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxied()) {
-					secure = application.getConfig().getVirtualHost().getConfig().getServer().getConfig().isProxySecure();
-				}
+				boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().isSecure();
 				URI uri = HTTPUtils.getURI(event, secure);
 				Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
 				ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());

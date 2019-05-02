@@ -18,7 +18,7 @@ import be.nabu.eai.repository.jaxb.ArtifactXMLAdapter;
 import be.nabu.libs.services.api.DefinedService;
 
 @XmlRootElement(name = "oAuth2")
-@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm", "redirectLink", "multipleEnvironments", "requireApprovalPrompt" })
+@XmlType(propOrder = { "clientId", "clientSecret", "scopes", "loginEndpoint", "tokenEndpoint", "apiEndpoint", "resource", "httpClient", "serverPath", "errorPath", "successPath", "authenticatorService", "requireStateToken", "tokenResolvingType", "redirectUriInTokenRequest", "jwtKeyStore", "jwtKeyAlias", "jwtUseOriginalRealm", "redirectLink", "multipleEnvironments", "requireApprovalPrompt", "ignoreAccessType" })
 public class OAuth2Configuration {
 	
 	public enum TokenResolverType {
@@ -49,7 +49,7 @@ public class OAuth2Configuration {
 	private String jwtKeyAlias;
 	private KeyStoreArtifact jwtKeyStore;
 	private boolean jwtUseOriginalRealm, multipleEnvironments;
-	private boolean requireApprovalPrompt;
+	private boolean requireApprovalPrompt, ignoreAccessType;
 	
 	@EnvironmentSpecific
 	public String getClientId() {
@@ -221,6 +221,15 @@ public class OAuth2Configuration {
 	}
 	public void setRequireApprovalPrompt(boolean requireApprovalPrompt) {
 		this.requireApprovalPrompt = requireApprovalPrompt;
+	}
+	
+	@Advanced
+	@Comment(title = "Some providers do not support an access type parameter")
+	public boolean isIgnoreAccessType() {
+		return ignoreAccessType;
+	}
+	public void setIgnoreAccessType(boolean ignoreAccessType) {
+		this.ignoreAccessType = ignoreAccessType;
 	}
 
 	
