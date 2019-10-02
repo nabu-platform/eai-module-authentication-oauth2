@@ -97,6 +97,10 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		if (childPath != null) {
 			path += "/" + childPath;
 		}
+		// add any proxy path
+		if (application.getConfig().getProxyPath() != null) {
+			path = application.getConfig().getProxyPath() + "/" + path;
+		}
 		path = path.replaceAll("[/]{2,}", "/");
 		String host = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getHost() : redirectLink.getHost();
 		HTTPServerArtifact server = application.getConfiguration().getVirtualHost().getConfiguration().getServer();

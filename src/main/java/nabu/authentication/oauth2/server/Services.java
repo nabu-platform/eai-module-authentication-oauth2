@@ -279,7 +279,16 @@ public class Services {
 		}
 		boolean secure = httpServer.isSecure();
 		String redirectLink = (secure ? "https" : "http") + "://" + webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() + (port == null ? "" : ":" + port) + "/";
+		if (webApplication.getConfig().getProxyPath() != null) {
+			if (!redirectLink.endsWith("/")) {
+				redirectLink += "/";
+			}
+			redirectLink += webApplication.getConfig().getProxyPath().replaceFirst("^[/]+", "");
+		}
 		if (webApplication.getConfiguration().getPath() != null && !webApplication.getConfiguration().getPath().isEmpty() && !webApplication.getConfiguration().getPath().equals("/")) {
+			if (!redirectLink.endsWith("/")) {
+				redirectLink += "/";
+			}
 			redirectLink += webApplication.getConfiguration().getPath().replaceFirst("^[/]+", "");
 		}
 		if (oauth2.getRelativePath() != null) {
