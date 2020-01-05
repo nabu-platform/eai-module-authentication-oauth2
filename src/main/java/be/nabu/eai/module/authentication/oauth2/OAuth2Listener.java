@@ -25,6 +25,7 @@ import be.nabu.eai.module.authentication.oauth2.api.OAuth2Authenticator;
 import be.nabu.eai.module.http.server.HTTPServerArtifact;
 import be.nabu.eai.module.keystore.KeyStoreArtifact;
 import be.nabu.eai.module.web.application.WebApplication;
+import be.nabu.eai.module.web.application.WebApplicationUtils;
 import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.eai.repository.util.SystemPrincipal;
 import be.nabu.libs.authentication.api.Token;
@@ -85,7 +86,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 	}
 	
-	private String getFullPath(String childPath, URI redirectLink) throws IOException {
+	private String getFullPath(String childPath, URI redirectLink, HTTPRequest request) throws IOException {
 		// it is already an absolute path
 		if (childPath.startsWith("http://") || childPath.startsWith("https://")) {
 			return childPath;
@@ -98,8 +99,9 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			path += "/" + childPath;
 		}
 		// add any proxy path
-		if (application.getConfig().getProxyPath() != null) {
-			path = application.getConfig().getProxyPath() + "/" + path;
+		String proxyPath = WebApplicationUtils.getProxyPath(application, request);
+		if (proxyPath != null) {
+			path = proxyPath + "/" + path;
 		}
 		path = path.replaceAll("[/]{2,}", "/");
 		String host = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getHost() : redirectLink.getHost();
@@ -133,7 +135,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 					}
 					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 						new PlainMimeEmptyPart(null, 
-							new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink)),
+							new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink, event)),
 							new MimeHeader("Content-Length", "0"))
 					);
 				}
@@ -264,7 +266,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 						newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
 						// set the correct headers to update the session
 						responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
-						responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink)));
+						responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink, event)));
 						responseHeaders.add(new MimeHeader("Content-Length", "0"));
 						logger.debug("Sending back 307");
 						return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
@@ -297,7 +299,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				try {
 					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
 						new PlainMimeEmptyPart(null, 
-							new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink == null ? new URI("/") : redirectLink)),
+							new MimeHeader("Location", getFullPath(artifact.getConfiguration().getErrorPath() == null ? "/" : artifact.getConfig().getErrorPath(), redirectLink == null ? new URI("/") : redirectLink, event)),
 							new MimeHeader("Content-Length", "0"))
 					);
 				}
