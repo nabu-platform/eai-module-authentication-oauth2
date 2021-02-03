@@ -9,6 +9,7 @@ import java.security.Key;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +48,7 @@ import be.nabu.libs.http.jwt.JWTBody;
 import be.nabu.libs.http.jwt.JWTToken;
 import be.nabu.libs.http.jwt.JWTUtils;
 import be.nabu.libs.resources.URIUtils;
+import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.Service;
 import be.nabu.libs.services.pojo.POJOUtils;
 import be.nabu.libs.types.TypeUtils;
@@ -188,52 +190,62 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							}
 						}
 						else {
-							OAuth2Authenticator proxy = POJOUtils.newProxy(
-								OAuth2Authenticator.class, 
-								artifact.getRepository(),
-								SystemPrincipal.ROOT,
-								authenticatorService
-							);
 							
-							// get the cookies, we want to see if there is a device id yet
-							Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
-							boolean isNewDevice = false;
-							List<String> cookieValues = cookies.get("Device-" + application.getRealm());
-							String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
-							if (deviceId == null) {
-								deviceId = UUID.randomUUID().toString().replace("-", "");
-								isNewDevice = true;
-							}
-							URI apiEndpoint = artifact.getConfig().getApiEndpoint();
-							if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
-								apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
-							}
-							logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-							token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
-								deviceId, 
-								GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
-								GlueHTTPUtils.getHost(event.getContent().getHeaders())
-							), apiEndpoint);
-							if (token == null) {
-								throw new HTTPException(500, "Login failed");
-							}
-							logger.debug("Natively authenticated as: " + token.getName());
-							// if it's a new device, set a cookie for it
-							if (isNewDevice) {
-								responseHeaders.add(HTTPUtils.newSetCookieHeader(
-									"Device-" + application.getRealm(), 
+							ServiceRuntime.setGlobalContext(new HashMap<String, Object>());
+							ServiceRuntime.getGlobalContext().put("service.context", application.getId());
+							ServiceRuntime.getGlobalContext().put("service.source", "oauth2");
+							
+							try {
+								OAuth2Authenticator proxy = POJOUtils.newProxy(
+									OAuth2Authenticator.class, 
+									artifact.getRepository(),
+									SystemPrincipal.ROOT,
+									authenticatorService
+								);
+								
+								// get the cookies, we want to see if there is a device id yet
+								Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
+								boolean isNewDevice = false;
+								List<String> cookieValues = cookies.get("Device-" + application.getRealm());
+								String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
+								if (deviceId == null) {
+									deviceId = UUID.randomUUID().toString().replace("-", "");
+									isNewDevice = true;
+								}
+								URI apiEndpoint = artifact.getConfig().getApiEndpoint();
+								if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
+									apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
+								}
+								logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
+								token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
 									deviceId, 
-									// Set it to 100 years in the future
-									new Date(new Date().getTime() + 1000l*60*60*24*365*100),
-									// path
-									webApplicationPath, 
-									// domain
-									null, 
-									// secure
-									secure,
-									// http only
-									true
-								));
+									GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
+									GlueHTTPUtils.getHost(event.getContent().getHeaders())
+								), apiEndpoint);
+								if (token == null) {
+									throw new HTTPException(500, "Login failed");
+								}
+								logger.debug("Natively authenticated as: " + token.getName());
+								// if it's a new device, set a cookie for it
+								if (isNewDevice) {
+									responseHeaders.add(HTTPUtils.newSetCookieHeader(
+										"Device-" + application.getRealm(), 
+										deviceId, 
+										// Set it to 100 years in the future
+										new Date(new Date().getTime() + 1000l*60*60*24*365*100),
+										// path
+										webApplicationPath, 
+										// domain
+										null, 
+										// secure
+										secure,
+										// http only
+										true
+									));
+								}
+							}
+							finally {
+								ServiceRuntime.setGlobalContext(null);
 							}
 						}
 						if (token instanceof TokenWithSecret && ((TokenWithSecret) token).getSecret() != null) {
@@ -339,9 +351,6 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 			JSONBinding binding = new JSONBinding((ComplexType) BeanResolver.getInstance().resolve(OAuth2IdentityWithContext.class));
 			binding.setIgnoreUnknownElements(true);
 			logger.debug("Unmarshalling token response");
-			if (logger.isTraceEnabled()) {
-				logger.trace("Token response: " + new String(IOUtils.toBytes(((ContentPart) response.getContent()).getReadable())));
-			}
 			ComplexContent unmarshal = binding.unmarshal(IOUtils.toInputStream(((ContentPart) response.getContent()).getReadable()), new Window[0]);
 			unmarshalled = TypeUtils.getAsBean(unmarshal, OAuth2IdentityWithContext.class, BeanResolver.getInstance());
 		}

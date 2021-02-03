@@ -6,7 +6,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlRootElement
 public class OAuth2Identity {
 	
-	private String accessToken, refreshToken, tokenType;
+	private String accessToken, refreshToken, tokenType, scope;
 	private Integer expiresIn;
 	
 	@XmlElement(name = "access_token")
@@ -41,4 +41,10 @@ public class OAuth2Identity {
 		this.refreshToken = refreshToken;
 	}
 	
+	public String getScope() {
+		return scope;
+	}
+	public void setScope(String scope) {
+		this.scope = scope;
+	}
 }
