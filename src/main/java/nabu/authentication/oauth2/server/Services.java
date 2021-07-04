@@ -164,7 +164,7 @@ public class Services {
 	}
 	
 	@WebResult(name = "link")
-	public String getRedirectLink(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @NotNull @WebParam(name = "webApplicationId") String webApplicationId, @WebParam(name = "accessType") AccessType accessType, @WebParam(name = "approvalPrompt") Boolean approvalPrompt) throws IOException {
+	public String getRedirectLink(@NotNull @WebParam(name = "oAuth2ArtifactId") String oAuth2ArtifactId, @WebParam(name = "webApplicationId") String webApplicationId, @WebParam(name = "accessType") AccessType accessType, @WebParam(name = "approvalPrompt") Boolean approvalPrompt) throws IOException {
 		OAuth2Artifact oauth2 = executionContext.getServiceContext().getResolver(OAuth2Artifact.class).resolve(oAuth2ArtifactId);
 		if (oauth2 == null) {
 			throw new IllegalArgumentException("Can not find oauth2 artifact: " + oAuth2ArtifactId);
@@ -172,17 +172,9 @@ public class Services {
 		if (approvalPrompt == null) {
 			approvalPrompt = oauth2.getConfig().isRequireApprovalPrompt();
 		}
-		WebApplication webApplication = executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
-		if (webApplication == null) {
-			throw new IllegalStateException("Can not find web application: " + webApplicationId);
-		}
-		if (!isIncluded(oauth2, webApplication)) {
-			throw new IllegalStateException("The oauth2 provider '" + oAuth2ArtifactId + "' is not included in the web application: " + webApplicationId);
-		}
-		if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
-			throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
-		}
-		ComplexContent configuration = webApplication.getConfigurationFor(oauth2.getConfig().getServerPath() == null ? "/" : oauth2.getConfig().getServerPath(), oauth2.getConfigurationType());
+		WebApplication webApplication = webApplicationId == null ? null : executionContext.getServiceContext().getResolver(WebApplication.class).resolve(webApplicationId);
+		
+		ComplexContent configuration = webApplication == null ? null : webApplication.getConfigurationFor(oauth2.getConfig().getServerPath() == null ? "/" : oauth2.getConfig().getServerPath(), oauth2.getConfigurationType());
 		StringBuilder builder = new StringBuilder();
 		if (oauth2.getConfiguration().getScopes() != null) {
 			for (String scope : oauth2.getConfiguration().getScopes()) {
@@ -203,6 +195,18 @@ public class Services {
 		URI configuredRedirectLink = oauth2.getConfiguration().getRedirectLink();
 		if (configuration != null && configuration.get("redirectLink") != null) {
 			configuredRedirectLink = (URI) configuration.get("redirectLink");
+		}
+		// if you did not configure a redirect uri, we have to build it from the web application, at that point you do need it
+		else if (configuredRedirectLink == null) {
+			if (webApplication == null) {
+				throw new IllegalStateException("Can not find web application: " + webApplicationId);
+			}
+			if (!isIncluded(oauth2, webApplication)) {
+				throw new IllegalStateException("The oauth2 provider '" + oAuth2ArtifactId + "' is not included in the web application: " + webApplicationId);
+			}
+			if (webApplication.getConfiguration().getVirtualHost().getConfiguration().getHost() == null) {
+				throw new IllegalStateException("To generate the redirect link for oauth2, you need to define the host name in the virtual host");
+			}
 		}
 		String redirectLink = configuredRedirectLink == null ? getRedirectLink(oauth2, webApplication) : configuredRedirectLink.toString();
 		
