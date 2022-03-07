@@ -1,17 +1,27 @@
 package nabu.authentication.oauth2.server;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.jws.WebParam;
 import javax.jws.WebResult;
 import javax.jws.WebService;
@@ -36,6 +46,7 @@ import be.nabu.libs.resources.URIUtils;
 import be.nabu.libs.services.ServiceRuntime;
 import be.nabu.libs.services.api.ExecutionContext;
 import be.nabu.libs.types.api.ComplexContent;
+import be.nabu.utils.io.IOUtils;
 import be.nabu.utils.mime.impl.FormatException;
 
 @WebService
@@ -237,14 +248,16 @@ public class Services {
 			endpoint += "&approval_prompt=auto";
 		}
 		
-		if (runtime.getContext().get("session") != null) {
-			// you can have multiple oauth2 modules in one call, they all need to use the same token 
-			String oauth2Token = (String) ((Session) runtime.getContext().get("session")).get(OAUTH2_TOKEN);
-			if (oauth2Token == null) {
-				oauth2Token = UUID.randomUUID().toString().replace("-", "");
-				((Session) runtime.getContext().get("session")).set(OAUTH2_TOKEN, oauth2Token);
+		if (oauth2.getConfig().getRequireStateToken() != null && oauth2.getConfig().getRequireStateToken()) {
+			String state;
+			try {
+				InputStream encrypt = webApplication.encrypt(new ByteArrayInputStream(("" + new Date().getTime()).getBytes("ASCII")));
+				state = new String(IOUtils.toBytes(IOUtils.wrap(encrypt)), "ASCII");
 			}
-			endpoint += "&state=" + oauth2Token;
+			catch (Exception e) {
+				throw new RuntimeException("Can not generate state for application: " + webApplicationId, e);
+			}
+			endpoint += "&state=" + state;
 		}
 		return endpoint;
 	}
@@ -252,13 +265,15 @@ public class Services {
 	private boolean isIncluded(OAuth2Artifact oauth2, WebFragmentProvider provider) {
 		if (provider.getWebFragments() != null) {
 			for (WebFragment fragment : provider.getWebFragments()) {
-				if (oauth2.equals(fragment)) {
-					return true;
-				}
-				else if (fragment instanceof WebFragmentProvider) {
-					boolean result = isIncluded(oauth2, (WebFragmentProvider) fragment);
-					if (result) {
+				if (fragment != null) {
+					if (oauth2.getId().equals(fragment.getId())) {
 						return true;
+					}
+					else if (fragment instanceof WebFragmentProvider) {
+						boolean result = isIncluded(oauth2, (WebFragmentProvider) fragment);
+						if (result) {
+							return true;
+						}
 					}
 				}
 			}

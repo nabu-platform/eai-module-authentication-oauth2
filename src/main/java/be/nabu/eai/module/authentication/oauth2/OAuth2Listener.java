@@ -1,6 +1,8 @@
 package be.nabu.eai.module.authentication.oauth2;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -144,20 +146,26 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				else {
 					boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
 					Session session = application.getSessionResolver().getSession(event.getContent().getHeaders());
-					if (session != null && mustValidateState) {
-						String oauth2Token = (String) session.get(Services.OAUTH2_TOKEN);
-						// check the token
-						if (oauth2Token != null) {
-							logger.debug("Checking csrf token for oauth2: " + oauth2Token);
-							if (!queryProperties.containsKey("state")) {
-								throw new HTTPException(400, "No csrf token found for oauth2 authentication");
-							}
-							else if (!oauth2Token.equals(queryProperties.get("state").get(0))) {
-								throw new HTTPException(400, "Possible csrf attack, the oauth2 token '" + oauth2Token + "' does not match the return state '" + queryProperties.get("state").get(0) + "'");
-							}
+					if (mustValidateState) {
+						if (!queryProperties.containsKey("state") || queryProperties.get("state").size() == 0) {
+							throw new HTTPException(400, "No csrf token found for oauth2 authentication");
 						}
-						else if (mustValidateState) {
-							throw new HTTPException(400, "No oauth2 state token found in the session, can not validate");
+						
+						// TODO: make this configurable at some point if needed
+						long maxDuration = 1000l * 60 * 60 * 24;
+						
+						Long timestamp;
+						try {
+							InputStream encrypt = application.decrypt(new ByteArrayInputStream(queryProperties.get("state").get(0).getBytes("ASCII")));
+							String state = new String(IOUtils.toBytes(IOUtils.wrap(encrypt)), "ASCII");
+							timestamp = Long.parseLong(state);
+						}
+						catch (Exception e) {
+							throw new HTTPException(500, HTTPCodes.getMessage(500), "Can not correctly decrypt state for application: " + application.getId() + ", oauth: " + artifact.getId(), e);
+						}
+						
+						if (!new Date(timestamp).before(new Date(new Date().getTime() - maxDuration))) {
+							throw new HTTPException(400, "The oauth2 state token is expired: " + new Date(timestamp));
 						}
 					}
 					else if (mustValidateState) {
