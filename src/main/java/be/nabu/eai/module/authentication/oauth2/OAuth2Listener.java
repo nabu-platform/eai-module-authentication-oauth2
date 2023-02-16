@@ -8,6 +8,8 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.Key;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -16,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import nabu.authentication.oauth2.server.Services;
+
 import nabu.authentication.oauth2.server.Services.GrantType;
 import nabu.authentication.oauth2.server.types.OAuth2Identity;
 
@@ -31,6 +33,7 @@ import be.nabu.eai.module.web.application.WebApplication;
 import be.nabu.eai.module.web.application.WebApplicationUtils;
 import be.nabu.eai.repository.EAIResourceRepository;
 import be.nabu.eai.repository.util.SystemPrincipal;
+import be.nabu.libs.authentication.api.Device;
 import be.nabu.libs.authentication.api.Token;
 import be.nabu.libs.authentication.api.TokenWithSecret;
 import be.nabu.libs.authentication.impl.DeviceImpl;
@@ -64,6 +67,7 @@ import be.nabu.utils.io.api.ByteBuffer;
 import be.nabu.utils.io.api.ReadableContainer;
 import be.nabu.utils.mime.api.ContentPart;
 import be.nabu.utils.mime.api.Header;
+import be.nabu.utils.mime.impl.FormatException;
 import be.nabu.utils.mime.impl.MimeHeader;
 import be.nabu.utils.mime.impl.MimeUtils;
 import be.nabu.utils.mime.impl.PlainMimeContentPart;
@@ -145,7 +149,6 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				}
 				else {
 					boolean mustValidateState = artifact.getConfiguration().getRequireStateToken() != null && artifact.getConfiguration().getRequireStateToken();
-					Session session = application.getSessionResolver().getSession(event.getContent().getHeaders());
 					if (mustValidateState) {
 						if (!queryProperties.containsKey("state") || queryProperties.get("state").size() == 0) {
 							throw new HTTPException(400, "No csrf token found for oauth2 authentication");
@@ -164,138 +167,94 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 							throw new HTTPException(500, HTTPCodes.getMessage(500), "Can not correctly decrypt state for application: " + application.getId() + ", oauth: " + artifact.getId(), e);
 						}
 						
-						if (!new Date(timestamp).before(new Date(new Date().getTime() - maxDuration))) {
+						if (new Date(timestamp).before(new Date(new Date().getTime() - maxDuration))) {
 							throw new HTTPException(400, "The oauth2 state token is expired: " + new Date(timestamp));
 						}
 					}
-					else if (mustValidateState) {
-						throw new HTTPException(400, "No session found, can not validate oauth2 state token");
-					}
 					logger.debug("OAuth2 login successful, code retrieved");
 					String code = queryProperties.get("code").get(0);
-					HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
-					try {
-						HTTPRequest request = buildTokenRequest(application, artifact, redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null, null, null, null, null);
-						logger.debug("Requesting token based on code: " + code);
-						HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
-						logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
-						if (response.getCode() != 200) {
-							throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
-						}
-						OAuth2IdentityWithContext unmarshalled = getIdentityFromResponse(response);
-						unmarshalled.setOauth2Provider(artifact.getId());
-						unmarshalled.setWebApplication(application.getId());
-						logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
-						Token token = null;
-						List<Header> responseHeaders = new ArrayList<Header>();
-						String webApplicationPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
-						// if we don't want to map it to an internal representation of the user, send it back as is
-						if (authenticatorService == null) {
-							token = new OAuth2Token(unmarshalled, application.getRealm());
-							JWTToken jwtToken = getJWTToken(artifact, application.getRealm(), unmarshalled);
-							if (jwtToken != null) {
-								token.getCredentials().add(jwtToken);
-							}
-						}
-						else {
-							
-							ServiceRuntime.setGlobalContext(new HashMap<String, Object>());
-							ServiceRuntime.getGlobalContext().put("service.context", application.getId());
-							ServiceRuntime.getGlobalContext().put("service.source", "oauth2");
-							
-							try {
-								OAuth2Authenticator proxy = POJOUtils.newProxy(
-									OAuth2Authenticator.class, 
-									artifact.getRepository(),
-									SystemPrincipal.ROOT,
-									authenticatorService
-								);
-								
-								// get the cookies, we want to see if there is a device id yet
-								Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
-								boolean isNewDevice = false;
-								List<String> cookieValues = cookies.get("Device-" + application.getRealm());
-								String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
-								if (deviceId == null) {
-									deviceId = UUID.randomUUID().toString().replace("-", "");
-									isNewDevice = true;
-								}
-								URI apiEndpoint = artifact.getConfig().getApiEndpoint();
-								if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
-									apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
-								}
-								logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
-								token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, new DeviceImpl(
-									deviceId, 
-									GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
-									GlueHTTPUtils.getHost(event.getContent().getHeaders())
-								), apiEndpoint);
-								if (token == null) {
-									throw new HTTPException(500, "Login failed");
-								}
-								logger.debug("Natively authenticated as: " + token.getName());
-								// if it's a new device, set a cookie for it
-								if (isNewDevice) {
-									responseHeaders.add(HTTPUtils.newSetCookieHeader(
-										"Device-" + application.getRealm(), 
-										deviceId, 
-										// Set it to 100 years in the future
-										new Date(new Date().getTime() + 1000l*60*60*24*365*100),
-										// path
-										webApplicationPath, 
-										// domain
-										null, 
-										// secure
-										secure,
-										// http only
-										true
-									));
-								}
-							}
-							finally {
-								ServiceRuntime.setGlobalContext(null);
-							}
-						}
-						if (token instanceof TokenWithSecret && ((TokenWithSecret) token).getSecret() != null) {
-							responseHeaders.add(HTTPUtils.newSetCookieHeader(
-								"Realm-" + application.getRealm(), 
-								token.getName() + "/" + ((TokenWithSecret) token).getSecret(), 
-								// if there is no valid until in the token, set it to a year
-								token.getValidUntil() == null ? new Date(new Date().getTime() + 1000l*60*60*24*365) : token.getValidUntil(),
-								// path
-								webApplicationPath, 
-								// domain
-								null, 
-								// secure
-								secure,
-								// http only
-								true
-							));
-						}
-						logger.debug("Creating new session");
-						// create a new session
-						Session newSession = application.getSessionProvider().newSession();
-						// copy & destroy the old one (if any)
-						if (session != null) {
-							for (String key : session) {
-								newSession.set(key, session.get(key));
-							}
-							session.destroy();
-						}
-						// set the token in the session
-						newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
-						// set the correct headers to update the session
-						responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
-						responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink, event)));
-						responseHeaders.add(new MimeHeader("Content-Length", "0"));
-						logger.debug("Sending back 307");
-						return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
-							new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
-						);
+					
+					// get the cookies, we want to see if there is a device id yet
+					Map<String, List<String>> cookies = HTTPUtils.getCookies(event.getContent().getHeaders());
+					boolean isNewDevice = false;
+					List<String> cookieValues = cookies.get("Device-" + application.getRealm());
+					String deviceId = cookieValues == null || cookieValues.isEmpty() ? null : cookieValues.get(0);
+					if (deviceId == null) {
+						deviceId = UUID.randomUUID().toString().replace("-", "");
+						isNewDevice = true;
 					}
-					finally {
-						newClient.close();
+					
+					Device device = new DeviceImpl(
+						deviceId, 
+						GlueHTTPUtils.getUserAgent(event.getContent().getHeaders()), 
+						GlueHTTPUtils.getHost(event.getContent().getHeaders())
+					);
+					URI apiEndpoint = artifact.getConfig().getApiEndpoint();
+					if (clientConfiguration != null && clientConfiguration.get("apiEndpoint") != null) {
+						apiEndpoint = (URI) clientConfiguration.get("apiEndpoint");
 					}
+					
+					Token token = getToken(device, redirectLink, apiEndpoint, code);
+					
+					String webApplicationPath = application.getConfiguration().getPath() == null || application.getConfiguration().getPath().isEmpty() ? "/" : application.getConfiguration().getPath();
+					List<Header> responseHeaders = new ArrayList<Header>();
+					// if it's a new device, set a cookie for it
+					if (isNewDevice) {
+						responseHeaders.add(HTTPUtils.newSetCookieHeader(
+							"Device-" + application.getRealm(), 
+							deviceId, 
+							// Set it to 100 years in the future
+							new Date(new Date().getTime() + 1000l*60*60*24*365*100),
+							// path
+							webApplicationPath, 
+							// domain
+							null, 
+							// secure
+							secure,
+							// http only
+							true
+						));
+					}
+					if (token instanceof TokenWithSecret && ((TokenWithSecret) token).getSecret() != null) {
+						responseHeaders.add(HTTPUtils.newSetCookieHeader(
+							"Realm-" + application.getRealm(), 
+							token.getName() + "/" + ((TokenWithSecret) token).getSecret(), 
+							// if there is no valid until in the token, set it to a year
+							token.getValidUntil() == null ? new Date(new Date().getTime() + 1000l*60*60*24*365) : token.getValidUntil(),
+									// path
+									webApplicationPath, 
+									// domain
+									null, 
+									// secure
+									secure,
+									// http only
+									true
+								));
+					}
+					
+					logger.debug("Creating new session");
+					
+					// get current session (if any)
+					Session session = application.getSessionResolver().getSession(event.getContent().getHeaders());
+					// create a new session
+					Session newSession = application.getSessionProvider().newSession();
+					// copy & destroy the old one (if any)
+					if (session != null) {
+						for (String key : session) {
+							newSession.set(key, session.get(key));
+						}
+						session.destroy();
+					}
+					// set the token in the session
+					newSession.set(GlueListener.buildTokenName(application.getRealm()), token);
+					// set the correct headers to update the session
+					responseHeaders.add(HTTPUtils.newSetCookieHeader(GlueListener.SESSION_COOKIE, newSession.getId(), null, webApplicationPath, null, secure, true));
+					responseHeaders.add(new MimeHeader("Location", getFullPath(artifact.getConfiguration().getSuccessPath() == null ? "/" : artifact.getConfiguration().getSuccessPath(), redirectLink, event)));
+					responseHeaders.add(new MimeHeader("Content-Length", "0"));
+					logger.debug("Sending back 307");
+					return new DefaultHTTPResponse(event, 307, HTTPCodes.getMessage(307),
+						new PlainMimeEmptyPart(null, responseHeaders.toArray(new Header[responseHeaders.size()]))
+					);
 				}
 			}
 			catch (HTTPException e) {
@@ -328,6 +287,61 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 				}
 			}
 		}
+	}
+
+	private Token getToken(Device device, URI redirectLink, URI apiEndpoint, String code) throws IOException, KeyStoreException, NoSuchAlgorithmException, UnsupportedEncodingException, FormatException, ParseException, URISyntaxException {
+		Token token;
+		HTTPClient newClient = nabu.protocols.http.client.Services.newClient(artifact.getConfiguration().getHttpClient());
+		try {
+			HTTPRequest request = buildTokenRequest(application, artifact, redirectLink, code, GrantType.AUTHORIZATION, artifact.getConfig().getRedirectUriInTokenRequest(), null, null, null, null, null, null, null);
+			logger.debug("Requesting token based on code: " + code);
+			HTTPResponse response = newClient.execute(request, null, isSecureTokenEndpoint(application, artifact), true);
+			logger.debug("Received token response " + response.getCode() + ": " + response.getMessage());
+			if (response.getCode() != 200) {
+				throw new HTTPException(500, "Could not retrieve access token based on code: " + response);
+			}
+			OAuth2IdentityWithContext unmarshalled = getIdentityFromResponse(response);
+			unmarshalled.setOauth2Provider(artifact.getId());
+			unmarshalled.setWebApplication(application.getId());
+			logger.debug("Received access token: " + unmarshalled.getAccessToken() + " which is valid for: " + unmarshalled.getExpiresIn());
+			// if we don't want to map it to an internal representation of the user, send it back as is
+			if (authenticatorService == null) {
+				token = new OAuth2Token(unmarshalled, application.getRealm());
+				JWTToken jwtToken = getJWTToken(artifact, application.getRealm(), unmarshalled);
+				if (jwtToken != null) {
+					token.getCredentials().add(jwtToken);
+				}
+			}
+			else {
+				
+				ServiceRuntime.setGlobalContext(new HashMap<String, Object>());
+				ServiceRuntime.getGlobalContext().put("service.context", application.getId());
+				ServiceRuntime.getGlobalContext().put("service.source", "oauth2");
+				
+				try {
+					OAuth2Authenticator proxy = POJOUtils.newProxy(
+						OAuth2Authenticator.class, 
+						artifact.getRepository(),
+						SystemPrincipal.ROOT,
+						authenticatorService
+					);
+					
+					logger.debug("Authenticating user with token using service: " + artifact.getConfiguration().getAuthenticatorService().getId());
+					token = proxy.authenticate(application.getId(), artifact.getId(), application.getRealm(), unmarshalled, device, apiEndpoint);
+					if (token == null) {
+						throw new HTTPException(500, "Login failed");
+					}
+					logger.debug("Natively authenticated as: " + token.getName());
+				}
+				finally {
+					ServiceRuntime.setGlobalContext(null);
+				}
+			}
+		}
+		finally {
+			newClient.close();
+		}
+		return token;
 	}
 
 	public static OAuth2IdentityWithContext getIdentityFromResponse(HTTPResponse response) throws IOException, UnsupportedEncodingException, URISyntaxException, ParseException {

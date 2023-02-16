@@ -54,3 +54,12 @@ REST Client artifact:
 	- **picture**: an avatar for the user
 	- **gender**: e.g. male
 	- **locale**: something like "nl"
+
+	
+# Third party tokens
+
+When using oauth with jwt tokens (e.g. openid), the question should be posed: once we have a valid JWT token from a third party, do we continue using that as your identifier or do we exchange it for a local token.
+
+Generally we will swap it in for a local token because your local identity may be enriched with other interesting bits (roles you may have, identifiers that are known to us but not the third party,...).
+Additionally we can choose how long the local token will be valid for, how it should be refreshed it, without being constrained by the third party requirements on that front.
+
