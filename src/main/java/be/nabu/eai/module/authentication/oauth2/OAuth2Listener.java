@@ -113,7 +113,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		}
 		path = path.replaceAll("[/]{2,}", "/");
 		String host = redirectLink == null ? application.getConfiguration().getVirtualHost().getConfiguration().getHost() : redirectLink.getHost();
-		HTTPServerArtifact server = application.getConfiguration().getVirtualHost().getConfiguration().getServer();
+		HTTPServerArtifact server = application.getConfiguration().getVirtualHost().getServer();
 		Integer port = redirectLink == null ? (server.getConfig().isProxied() ? server.getConfig().getProxyPort() : server.getConfiguration().getPort()) : Integer.valueOf(redirectLink.getPort());
 		if (port != null && port < 0) {
 			port = null;
@@ -128,7 +128,7 @@ public class OAuth2Listener implements EventHandler<HTTPRequest, HTTPResponse> {
 		try {
 			try {
 				// by default we determine secure based on the availability of the keystore
-				boolean secure = application.getConfiguration().getVirtualHost().getConfiguration().getServer().isSecure();
+				boolean secure = application.getConfiguration().getVirtualHost().getServer().isSecure();
 				URI uri = HTTPUtils.getURI(event, secure);
 				Map<String, List<String>> queryProperties = URIUtils.getQueryProperties(uri);
 				ComplexContent clientConfiguration = application == null ? null : application.getConfigurationFor(artifact.getConfig().getServerPath() == null ? "/" : artifact.getConfig().getServerPath(), artifact.getConfigurationType());

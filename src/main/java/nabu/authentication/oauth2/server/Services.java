@@ -282,7 +282,7 @@ public class Services {
 	}
 	
 	private String getRedirectLink(OAuth2Artifact oauth2, WebApplication webApplication) throws IOException {
-		HTTPServerArtifact httpServer = webApplication.getConfiguration().getVirtualHost().getConfiguration().getServer();
+		HTTPServerArtifact httpServer = webApplication.getConfiguration().getVirtualHost().getServer();
 		if (httpServer == null) {
 			throw new IllegalStateException("No http server found");
 		}
